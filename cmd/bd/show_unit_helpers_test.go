@@ -35,6 +35,54 @@ func TestValidateIssueClosable(t *testing.T) {
 	}
 }
 
+func TestValidatePhaseComplete(t *testing.T) {
+	// No comments - should fail without force
+	if err := validatePhaseComplete("bd-1", nil, false); err == nil {
+		t.Fatalf("expected error when no comments")
+	}
+
+	// Empty comments - should fail without force
+	if err := validatePhaseComplete("bd-1", []*types.Comment{}, false); err == nil {
+		t.Fatalf("expected error when empty comments")
+	}
+
+	// Comment without Phase: Complete - should fail
+	comments := []*types.Comment{
+		{Text: "Phase: Planning - Started work"},
+		{Text: "Phase: Implementing - Making changes"},
+	}
+	if err := validatePhaseComplete("bd-1", comments, false); err == nil {
+		t.Fatalf("expected error when no Phase: Complete comment")
+	}
+
+	// Comment with Phase: Complete - should succeed
+	comments = append(comments, &types.Comment{Text: "Phase: Complete - All done"})
+	if err := validatePhaseComplete("bd-1", comments, false); err != nil {
+		t.Fatalf("expected success with Phase: Complete comment, got %v", err)
+	}
+
+	// Force flag bypasses check
+	if err := validatePhaseComplete("bd-1", nil, true); err != nil {
+		t.Fatalf("expected force to bypass check, got %v", err)
+	}
+
+	// Phase: Complete with extra text
+	singleComment := []*types.Comment{
+		{Text: "Phase: Complete - Fixed the bug and added tests"},
+	}
+	if err := validatePhaseComplete("bd-1", singleComment, false); err != nil {
+		t.Fatalf("expected success with Phase: Complete in comment, got %v", err)
+	}
+
+	// Phase: Complete as part of longer text
+	longComment := []*types.Comment{
+		{Text: "After Phase: Complete, the orchestrator will verify"},
+	}
+	if err := validatePhaseComplete("bd-1", longComment, false); err != nil {
+		t.Fatalf("expected success with Phase: Complete anywhere in text, got %v", err)
+	}
+}
+
 func TestApplyLabelUpdates_SetAddRemove(t *testing.T) {
 	ctx := context.Background()
 	st := memory.New("")

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/steveyegge/beads/internal/storage"
 	"github.com/steveyegge/beads/internal/types"
@@ -29,6 +30,26 @@ func validateIssueClosable(id string, issue *types.Issue, force bool) error {
 		return fmt.Errorf("Error: cannot close pinned issue %s (use --force to override)", id)
 	}
 	return nil
+}
+
+// validatePhaseComplete checks if an issue has a "Phase: Complete" comment.
+// Returns nil if:
+//   - force is true (skip validation)
+//   - comments contains "Phase: Complete" (verified completion)
+//   - issue is nil (for consistency with other validators)
+//
+// Returns error if:
+//   - no "Phase: Complete" comment found (missing completion verification)
+func validatePhaseComplete(id string, comments []*types.Comment, force bool) error {
+	if force {
+		return nil
+	}
+	for _, c := range comments {
+		if strings.Contains(c.Text, "Phase: Complete") {
+			return nil
+		}
+	}
+	return fmt.Errorf("Error: cannot close %s: no 'Phase: Complete' comment found (use --force to override)", id)
 }
 
 func applyLabelUpdates(ctx context.Context, st storage.Storage, issueID, actor string, setLabels, addLabels, removeLabels []string) error {

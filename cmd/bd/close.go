@@ -85,6 +85,18 @@ var closeCmd = &cobra.Command{
 					}
 				}
 
+				// Validate Phase: Complete comment exists (unless --force)
+				commentsResp, commentsErr := daemonClient.ListComments(&rpc.CommentListArgs{ID: id})
+				if commentsErr == nil {
+					var comments []*types.Comment
+					if json.Unmarshal(commentsResp.Data, &comments) == nil {
+						if err := validatePhaseComplete(id, comments, force); err != nil {
+							fmt.Fprintf(os.Stderr, "%s\n", err)
+							continue
+						}
+					}
+				}
+
 				closeArgs := &rpc.CloseArgs{
 					ID:          id,
 					Reason:      reason,
@@ -158,6 +170,13 @@ var closeCmd = &cobra.Command{
 			issue, _ := store.GetIssue(ctx, id)
 
 			if err := validateIssueClosable(id, issue, force); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				continue
+			}
+
+			// Validate Phase: Complete comment exists (unless --force)
+			comments, _ := store.GetIssueComments(ctx, id)
+			if err := validatePhaseComplete(id, comments, force); err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 				continue
 			}
@@ -236,7 +255,7 @@ func init() {
 	closeCmd.Flags().StringP("reason", "r", "", "Reason for closing")
 	closeCmd.Flags().String("resolution", "", "Alias for --reason (Jira CLI convention)")
 	_ = closeCmd.Flags().MarkHidden("resolution") // Hidden alias for agent/CLI ergonomics
-	closeCmd.Flags().BoolP("force", "f", false, "Force close pinned issues")
+	closeCmd.Flags().BoolP("force", "f", false, "Force close (bypasses pinned and Phase: Complete checks)")
 	closeCmd.Flags().Bool("continue", false, "Auto-advance to next step in molecule")
 	closeCmd.Flags().Bool("no-auto", false, "With --continue, show next step but don't claim it")
 	closeCmd.Flags().Bool("suggest-next", false, "Show newly unblocked issues after closing")
