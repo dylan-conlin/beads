@@ -1,5 +1,20 @@
 # Makefile for beads project
 
+# Binary name
+BINARY_NAME=bd
+
+# Build directory
+BUILD_DIR=build
+
+# Install directory
+INSTALL_DIR=$(HOME)/bin
+
+# Get version info for ldflags
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+SHORT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+LDFLAGS=-ldflags="-X main.Build=$(SHORT_COMMIT) -X main.Commit=$(COMMIT) -X main.Branch=$(BRANCH)"
+
 .PHONY: all build test bench bench-quick clean install help
 
 # Default target
@@ -7,8 +22,9 @@ all: build
 
 # Build the bd binary
 build:
-	@echo "Building bd..."
-	go build -ldflags="-X main.Build=$$(git rev-parse --short HEAD)" -o bd ./cmd/bd
+	@echo "Building $(BINARY_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/bd
 
 # Run all tests (skips known broken tests listed in .test-skip)
 test:
@@ -33,17 +49,21 @@ bench-quick:
 	@echo "Running quick performance benchmarks..."
 	go test -bench=. -benchtime=100ms -tags=bench -run=^$$ ./internal/storage/sqlite/ -timeout=15m
 
-# Install bd to GOPATH/bin
-install:
-	@echo "Installing bd to $$(go env GOPATH)/bin..."
-	@bash -c 'commit=$$(git rev-parse HEAD 2>/dev/null || echo ""); \
-		branch=$$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ""); \
-		go install -ldflags="-X main.Commit=$$commit -X main.Branch=$$branch" ./cmd/bd'
+# Install to ~/bin (symlink to build output)
+# This makes `make build` automatically update the human-accessible CLI
+install: build
+	@echo "Installing $(BINARY_NAME) to $(INSTALL_DIR) (symlink)..."
+	@mkdir -p $(INSTALL_DIR)
+	@# Remove existing file/symlink and create new symlink
+	@rm -f $(INSTALL_DIR)/$(BINARY_NAME)
+	@ln -sf $(CURDIR)/$(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
+	@echo "Linked $(INSTALL_DIR)/$(BINARY_NAME) → $(CURDIR)/$(BUILD_DIR)/$(BINARY_NAME)"
 
 # Clean build artifacts and benchmark profiles
 clean:
 	@echo "Cleaning..."
-	rm -f bd
+	rm -rf $(BUILD_DIR)
+	rm -f $(BINARY_NAME)
 	rm -f internal/storage/sqlite/bench-cpu-*.prof
 	rm -f beads-perf-*.prof
 
@@ -54,6 +74,6 @@ help:
 	@echo "  make test         - Run all tests"
 	@echo "  make bench        - Run performance benchmarks (generates CPU profiles)"
 	@echo "  make bench-quick  - Run quick benchmarks (shorter benchtime)"
-	@echo "  make install      - Install bd to GOPATH/bin"
+	@echo "  make install      - Install to ~/bin (symlink to build output)"
 	@echo "  make clean        - Remove build artifacts and profile files"
 	@echo "  make help         - Show this help message"
