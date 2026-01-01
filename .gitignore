@@ -1,6 +1,7 @@
 # Binaries
 /beads
 /bd
+/build/
 *.exe
 *.dll
 *.so
