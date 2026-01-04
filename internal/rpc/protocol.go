@@ -85,6 +85,9 @@ type CreateArgs struct {
 	EstimatedMinutes   *int     `json:"estimated_minutes,omitempty"` // Time estimate in minutes
 	Labels             []string `json:"labels,omitempty"`
 	Dependencies       []string `json:"dependencies,omitempty"`
+	// Bug reproduction fields (required for type=bug)
+	Repro         string `json:"repro,omitempty"`          // Steps/evidence to reproduce
+	NoReproReason string `json:"no_repro_reason,omitempty"` // Why repro not possible (if --no-repro used)
 	// Waits-for dependencies
 	WaitsFor     string `json:"waits_for,omitempty"`      // Spawner issue ID to wait for
 	WaitsForGate string `json:"waits_for_gate,omitempty"` // Gate type: all-children or any-children

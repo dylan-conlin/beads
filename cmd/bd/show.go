@@ -131,6 +131,12 @@ var showCmd = &cobra.Command{
 					if issue.Description != "" {
 						fmt.Printf("\nDescription:\n%s\n", issue.Description)
 					}
+					if issue.Repro != "" {
+						fmt.Printf("\nReproduction:\n%s\n", issue.Repro)
+					}
+					if issue.NoReproReason != "" {
+						fmt.Printf("\nNo Reproduction (reason): %s\n", issue.NoReproReason)
+					}
 					fmt.Println()
 					displayIdx++
 				}
@@ -239,6 +245,12 @@ var showCmd = &cobra.Command{
 
 					if issue.Description != "" {
 						fmt.Printf("\nDescription:\n%s\n", issue.Description)
+					}
+					if issue.Repro != "" {
+						fmt.Printf("\nReproduction:\n%s\n", issue.Repro)
+					}
+					if issue.NoReproReason != "" {
+						fmt.Printf("\nNo Reproduction (reason): %s\n", issue.NoReproReason)
 					}
 					if issue.Design != "" {
 						fmt.Printf("\nDesign:\n%s\n", issue.Design)
@@ -451,6 +463,12 @@ var showCmd = &cobra.Command{
 
 			if issue.Description != "" {
 				fmt.Printf("\nDescription:\n%s\n", issue.Description)
+			}
+			if issue.Repro != "" {
+				fmt.Printf("\nReproduction:\n%s\n", issue.Repro)
+			}
+			if issue.NoReproReason != "" {
+				fmt.Printf("\nNo Reproduction (reason): %s\n", issue.NoReproReason)
 			}
 			if issue.Design != "" {
 				fmt.Printf("\nDesign:\n%s\n", issue.Design)

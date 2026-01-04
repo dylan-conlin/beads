@@ -23,6 +23,10 @@ type Issue struct {
 	AcceptanceCriteria string `json:"acceptance_criteria,omitempty"`
 	Notes              string `json:"notes,omitempty"`
 
+	// ===== Bug Reproduction (required for type=bug) =====
+	Repro          string `json:"repro,omitempty"`            // Steps/evidence to reproduce the bug
+	NoReproReason  string `json:"no_repro_reason,omitempty"`  // Why repro is not possible (if --no-repro used)
+
 	// ===== Status & Workflow =====
 	Status    Status    `json:"status,omitempty"`
 	Priority  int       `json:"priority"` // No omitempty: 0 is valid (P0/critical)
@@ -115,6 +119,8 @@ func (i *Issue) ComputeContentHash() string {
 	w.str(i.Design)
 	w.str(i.AcceptanceCriteria)
 	w.str(i.Notes)
+	w.str(i.Repro)
+	w.str(i.NoReproReason)
 	w.str(string(i.Status))
 	w.int(i.Priority)
 	w.str(string(i.IssueType))

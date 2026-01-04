@@ -130,6 +130,37 @@ var createCmd = &cobra.Command{
 			FatalError("--role-type and --agent-rig flags require --type=agent")
 		}
 
+		// Bug reproduction flags
+		repro, _ := cmd.Flags().GetString("repro")
+		noRepro, _ := cmd.Flags().GetBool("no-repro")
+		noReproReason, _ := cmd.Flags().GetString("reason")
+
+		// Validate bug reproduction requirements
+		if issueType == "bug" {
+			if repro == "" && !noRepro {
+				FatalError("--type=bug requires either --repro 'steps/evidence' or --no-repro --reason 'why'\n" +
+					"  Example: bd create --type bug 'Login fails' --repro 'Run login.sh, observe timeout'\n" +
+					"  Example: bd create --type bug 'Random crash' --no-repro --reason 'One-time with no logs'")
+			}
+			if noRepro && noReproReason == "" {
+				FatalError("--no-repro requires --reason explaining why reproduction is not possible")
+			}
+			if repro != "" && noRepro {
+				FatalError("cannot specify both --repro and --no-repro")
+			}
+		} else {
+			// Validate repro flags are not used with non-bug types
+			if repro != "" {
+				FatalError("--repro flag requires --type=bug")
+			}
+			if noRepro {
+				FatalError("--no-repro flag requires --type=bug")
+			}
+			if noReproReason != "" && !noRepro {
+				FatalError("--reason flag requires --no-repro")
+			}
+		}
+
 		// Handle --rig or --prefix flag: create issue in a different rig
 		// Both flags use the same forgiving lookup (accepts rig names or prefixes)
 		targetRig := rigOverride
@@ -269,6 +300,8 @@ var createCmd = &cobra.Command{
 				MolType:            string(molType),
 				RoleType:           roleType,
 				Rig:                agentRig,
+				Repro:              repro,
+				NoReproReason:      noReproReason,
 			}
 
 			resp, err := daemonClient.Create(createArgs)
@@ -318,6 +351,8 @@ var createCmd = &cobra.Command{
 			MolType:            molType,
 			RoleType:           roleType,
 			Rig:                agentRig,
+			Repro:              repro,
+			NoReproReason:      noReproReason,
 		}
 
 		ctx := rootCtx
@@ -519,6 +554,10 @@ func init() {
 	// Agent-specific flags (only valid when --type=agent)
 	createCmd.Flags().String("role-type", "", "Agent role type: polecat|crew|witness|refinery|mayor|deacon (requires --type=agent)")
 	createCmd.Flags().String("agent-rig", "", "Agent's rig name (requires --type=agent)")
+	// Bug reproduction flags (required for --type=bug)
+	createCmd.Flags().String("repro", "", "Bug reproduction steps/evidence (required for --type=bug)")
+	createCmd.Flags().Bool("no-repro", false, "Skip reproduction requirement (must provide --reason)")
+	createCmd.Flags().String("reason", "", "Reason why reproduction is not possible (requires --no-repro)")
 	// Note: --json flag is defined as a persistent flag in main.go, not here
 	rootCmd.AddCommand(createCmd)
 }

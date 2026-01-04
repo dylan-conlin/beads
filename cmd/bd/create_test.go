@@ -551,4 +551,79 @@ func TestCreateSuite(t *testing.T) {
 			t.Errorf("expected source_repo '/path/to/custom/repo', got %q", retrievedIssue.SourceRepo)
 		}
 	})
+
+	t.Run("BugWithRepro", func(t *testing.T) {
+		issue := &types.Issue{
+			Title:     "Bug with repro steps",
+			IssueType: types.TypeBug,
+			Priority:  1,
+			Status:    types.StatusOpen,
+			Repro:     "1. Run command X\n2. Observe error Y",
+			CreatedAt: time.Now(),
+		}
+
+		if err := s.CreateIssue(ctx, issue, "test"); err != nil {
+			t.Fatalf("failed to create issue: %v", err)
+		}
+
+		retrieved, err := s.GetIssue(ctx, issue.ID)
+		if err != nil {
+			t.Fatalf("failed to get issue: %v", err)
+		}
+
+		if retrieved.Repro != "1. Run command X\n2. Observe error Y" {
+			t.Errorf("expected repro steps, got %q", retrieved.Repro)
+		}
+	})
+
+	t.Run("BugWithNoRepro", func(t *testing.T) {
+		issue := &types.Issue{
+			Title:         "Bug without repro",
+			IssueType:     types.TypeBug,
+			Priority:      1,
+			Status:        types.StatusOpen,
+			NoReproReason: "One-time crash with no logs available",
+			CreatedAt:     time.Now(),
+		}
+
+		if err := s.CreateIssue(ctx, issue, "test"); err != nil {
+			t.Fatalf("failed to create issue: %v", err)
+		}
+
+		retrieved, err := s.GetIssue(ctx, issue.ID)
+		if err != nil {
+			t.Fatalf("failed to get issue: %v", err)
+		}
+
+		if retrieved.NoReproReason != "One-time crash with no logs available" {
+			t.Errorf("expected no-repro reason, got %q", retrieved.NoReproReason)
+		}
+	})
+
+	t.Run("NonBugWithoutRepro", func(t *testing.T) {
+		// Non-bug types should not have repro fields set
+		issue := &types.Issue{
+			Title:     "Feature request",
+			IssueType: types.TypeFeature,
+			Priority:  2,
+			Status:    types.StatusOpen,
+			CreatedAt: time.Now(),
+		}
+
+		if err := s.CreateIssue(ctx, issue, "test"); err != nil {
+			t.Fatalf("failed to create issue: %v", err)
+		}
+
+		retrieved, err := s.GetIssue(ctx, issue.ID)
+		if err != nil {
+			t.Fatalf("failed to get issue: %v", err)
+		}
+
+		if retrieved.Repro != "" {
+			t.Errorf("expected empty repro for non-bug, got %q", retrieved.Repro)
+		}
+		if retrieved.NoReproReason != "" {
+			t.Errorf("expected empty no-repro reason for non-bug, got %q", retrieved.NoReproReason)
+		}
+	})
 }

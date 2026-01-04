@@ -208,6 +208,9 @@ func (s *Server) handleCreate(req *Request) Response {
 		// Agent identity fields
 		RoleType: createArgs.RoleType,
 		Rig:      createArgs.Rig,
+		// Bug reproduction fields
+		Repro:         createArgs.Repro,
+		NoReproReason: createArgs.NoReproReason,
 	}
 	
 	// Check if any dependencies are discovered-from type
