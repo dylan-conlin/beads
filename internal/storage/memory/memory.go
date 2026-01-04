@@ -467,11 +467,16 @@ func (m *MemoryStorage) UpdateIssue(ctx context.Context, id string, updates map[
 	return nil
 }
 
-// CloseIssue closes an issue with a reason
-func (m *MemoryStorage) CloseIssue(ctx context.Context, id string, reason string, actor string) error {
-	return m.UpdateIssue(ctx, id, map[string]interface{}{
-		"status": string(types.StatusClosed),
-	}, actor)
+// CloseIssue closes an issue with a reason and optional outcome
+func (m *MemoryStorage) CloseIssue(ctx context.Context, id string, reason string, outcome types.CloseOutcome, actor string) error {
+	updates := map[string]interface{}{
+		"status":       string(types.StatusClosed),
+		"close_reason": reason,
+	}
+	if outcome != "" {
+		updates["close_outcome"] = string(outcome)
+	}
+	return m.UpdateIssue(ctx, id, updates, actor)
 }
 
 // DeleteIssue permanently deletes an issue and all associated data
@@ -1380,6 +1385,10 @@ func (m *MemoryStorage) GetStatistics(ctx context.Context) (*types.Statistics, e
 			stats.InProgressIssues++
 		case types.StatusClosed:
 			stats.ClosedIssues++
+			// Count could-not-reproduce outcomes
+			if issue.CloseOutcome == types.OutcomeCouldNotReproduce {
+				stats.CouldNotReproduce++
+			}
 		case types.StatusDeferred:
 			stats.DeferredIssues++
 		case types.StatusTombstone:

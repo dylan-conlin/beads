@@ -319,7 +319,7 @@ func TestCloseIssue(t *testing.T) {
 	}
 
 	// Close it
-	if err := store.CloseIssue(ctx, issue.ID, "Completed", "test-user"); err != nil {
+	if err := store.CloseIssue(ctx, issue.ID, "Completed", "", "test-user"); err != nil {
 		t.Fatalf("CloseIssue failed: %v", err)
 	}
 
@@ -732,7 +732,7 @@ func TestStatistics(t *testing.T) {
 		}
 		// Close the one marked as closed
 		if issue.Status == types.StatusClosed {
-			if err := store.CloseIssue(ctx, issue.ID, "Done", "test-user"); err != nil {
+			if err := store.CloseIssue(ctx, issue.ID, "Done", "", "test-user"); err != nil {
 				t.Fatalf("CloseIssue failed: %v", err)
 			}
 		}
@@ -785,7 +785,7 @@ func TestStatistics_BlockedAndReadyCounts(t *testing.T) {
 	}
 
 	// Close the closedBlocker properly
-	if err := store.CloseIssue(ctx, closedBlocker.ID, "Done", "test"); err != nil {
+	if err := store.CloseIssue(ctx, closedBlocker.ID, "Done", "", "test"); err != nil {
 		t.Fatalf("CloseIssue failed: %v", err)
 	}
 
@@ -877,7 +877,7 @@ func TestStatistics_EpicsEligibleForClosure(t *testing.T) {
 
 	// Close the children properly
 	for _, child := range []*types.Issue{child1, child2} {
-		if err := store.CloseIssue(ctx, child.ID, "Done", "test"); err != nil {
+		if err := store.CloseIssue(ctx, child.ID, "Done", "", "test"); err != nil {
 			t.Fatalf("CloseIssue failed: %v", err)
 		}
 	}
@@ -925,7 +925,7 @@ func TestStatistics_TombstonesExcludedFromTotal(t *testing.T) {
 	}
 
 	// Close the closed issue properly
-	if err := store.CloseIssue(ctx, issues[1].ID, "Done", "test"); err != nil {
+	if err := store.CloseIssue(ctx, issues[1].ID, "Done", "", "test"); err != nil {
 		t.Fatalf("CloseIssue failed: %v", err)
 	}
 

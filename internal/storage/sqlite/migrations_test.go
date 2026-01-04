@@ -480,6 +480,7 @@ func TestMigrateContentHashColumn(t *testing.T) {
 				compacted_at_commit TEXT,
 				source_repo TEXT DEFAULT '.',
 				close_reason TEXT DEFAULT '',
+				close_outcome TEXT DEFAULT '',
 				deleted_at TEXT,
 				deleted_by TEXT DEFAULT '',
 				delete_reason TEXT DEFAULT '',
@@ -507,7 +508,7 @@ func TestMigrateContentHashColumn(t *testing.T) {
 				no_repro_reason TEXT DEFAULT '',
 				CHECK ((status = 'closed') = (closed_at IS NOT NULL))
 			);
-			INSERT INTO issues SELECT id, title, description, design, acceptance_criteria, notes, status, priority, issue_type, assignee, estimated_minutes, created_at, '', updated_at, closed_at, external_ref, compaction_level, compacted_at, original_size, compacted_at_commit, source_repo, '', NULL, '', '', '', '', 0, 0, 0, '', '', '', '', '', '', 0, '', '', '', '', NULL, '', '', '', '', '' FROM issues_backup;
+			INSERT INTO issues SELECT id, title, description, design, acceptance_criteria, notes, status, priority, issue_type, assignee, estimated_minutes, created_at, '', updated_at, closed_at, external_ref, compaction_level, compacted_at, original_size, compacted_at_commit, source_repo, '', '', NULL, '', '', '', '', 0, 0, 0, '', '', '', '', '', '', 0, '', '', '', '', NULL, '', '', '', '', '' FROM issues_backup;
 			DROP TABLE issues_backup;
 		`)
 		if err != nil {

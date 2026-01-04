@@ -113,6 +113,7 @@ func (s *SQLiteStorage) GetStatistics(ctx context.Context) (*types.Statistics, e
 	// Get counts (bd-nyt: exclude tombstones from TotalIssues, report separately)
 	// (bd-6v2: also count pinned issues)
 	// (bd-4jr: also count deferred issues)
+	// (orch-go-jjd4.3: count could-not-reproduce outcomes)
 	err := s.db.QueryRowContext(ctx, `
 		SELECT
 			COALESCE(SUM(CASE WHEN status != 'tombstone' THEN 1 ELSE 0 END), 0) as total,
@@ -121,9 +122,10 @@ func (s *SQLiteStorage) GetStatistics(ctx context.Context) (*types.Statistics, e
 			COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0) as closed,
 			COALESCE(SUM(CASE WHEN status = 'deferred' THEN 1 ELSE 0 END), 0) as deferred,
 			COALESCE(SUM(CASE WHEN status = 'tombstone' THEN 1 ELSE 0 END), 0) as tombstone,
-			COALESCE(SUM(CASE WHEN pinned = 1 THEN 1 ELSE 0 END), 0) as pinned
+			COALESCE(SUM(CASE WHEN pinned = 1 THEN 1 ELSE 0 END), 0) as pinned,
+			COALESCE(SUM(CASE WHEN close_outcome = 'could-not-reproduce' THEN 1 ELSE 0 END), 0) as could_not_reproduce
 		FROM issues
-	`).Scan(&stats.TotalIssues, &stats.OpenIssues, &stats.InProgressIssues, &stats.ClosedIssues, &stats.DeferredIssues, &stats.TombstoneIssues, &stats.PinnedIssues)
+	`).Scan(&stats.TotalIssues, &stats.OpenIssues, &stats.InProgressIssues, &stats.ClosedIssues, &stats.DeferredIssues, &stats.TombstoneIssues, &stats.PinnedIssues, &stats.CouldNotReproduce)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get issue counts: %w", err)
 	}

@@ -142,7 +142,7 @@ Examples:
 
 		// Extended statistics (only show if non-zero)
 		hasExtended := stats.TombstoneIssues > 0 || stats.PinnedIssues > 0 ||
-			stats.EpicsEligibleForClosure > 0 || stats.AverageLeadTime > 0
+			stats.EpicsEligibleForClosure > 0 || stats.AverageLeadTime > 0 || stats.CouldNotReproduce > 0
 		if hasExtended {
 			fmt.Printf("\nExtended:\n")
 			if stats.TombstoneIssues > 0 {
@@ -156,6 +156,9 @@ Examples:
 			}
 			if stats.AverageLeadTime > 0 {
 				fmt.Printf("  Avg Lead Time:          %.1f hours\n", stats.AverageLeadTime)
+			}
+			if stats.CouldNotReproduce > 0 {
+				fmt.Printf("  Could Not Reproduce:    %d\n", stats.CouldNotReproduce)
 			}
 		}
 

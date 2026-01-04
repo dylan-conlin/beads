@@ -40,8 +40,9 @@ type Issue struct {
 	CreatedAt   time.Time  `json:"created_at"`
 	CreatedBy   string     `json:"created_by,omitempty"` // Who created this issue (GH#748)
 	UpdatedAt   time.Time  `json:"updated_at"`
-	ClosedAt    *time.Time `json:"closed_at,omitempty"`
-	CloseReason string     `json:"close_reason,omitempty"` // Reason provided when closing
+	ClosedAt     *time.Time   `json:"closed_at,omitempty"`
+	CloseReason  string       `json:"close_reason,omitempty"`  // Reason provided when closing
+	CloseOutcome CloseOutcome `json:"close_outcome,omitempty"` // Outcome category (completed, could-not-reproduce, etc.)
 
 	// ===== External Integration =====
 	ExternalRef *string `json:"external_ref,omitempty"` // e.g., "gh-9", "jira-ABC"
@@ -412,6 +413,38 @@ func (t IssueType) IsValid() bool {
 	return false
 }
 
+// CloseOutcome categorizes how an issue was closed
+type CloseOutcome string
+
+// Close outcome constants
+const (
+	OutcomeCompleted         CloseOutcome = "completed"           // Issue was successfully completed/resolved
+	OutcomeCouldNotReproduce CloseOutcome = "could-not-reproduce" // Bug could not be reproduced
+	OutcomeDuplicate         CloseOutcome = "duplicate"           // Issue is a duplicate of another
+	OutcomeWontFix           CloseOutcome = "wont-fix"            // Issue will not be fixed
+	OutcomeInvalid           CloseOutcome = "invalid"             // Issue is not valid (user error, misunderstanding, etc.)
+)
+
+// IsValid checks if the close outcome value is valid
+func (o CloseOutcome) IsValid() bool {
+	switch o {
+	case OutcomeCompleted, OutcomeCouldNotReproduce, OutcomeDuplicate, OutcomeWontFix, OutcomeInvalid, "":
+		return true // empty is valid (defaults to completed)
+	}
+	return false
+}
+
+// AllCloseOutcomes returns all valid close outcomes for documentation/validation
+func AllCloseOutcomes() []CloseOutcome {
+	return []CloseOutcome{
+		OutcomeCompleted,
+		OutcomeCouldNotReproduce,
+		OutcomeDuplicate,
+		OutcomeWontFix,
+		OutcomeInvalid,
+	}
+}
+
 // AgentState represents the self-reported state of an agent
 type AgentState string
 
@@ -677,6 +710,8 @@ type Statistics struct {
 	PinnedIssues             int     `json:"pinned_issues"`    // Persistent issues
 	EpicsEligibleForClosure  int     `json:"epics_eligible_for_closure"`
 	AverageLeadTime          float64 `json:"average_lead_time_hours"`
+	// Close outcome statistics
+	CouldNotReproduce int `json:"could_not_reproduce,omitempty"` // Issues closed with could-not-reproduce outcome
 }
 
 // IssueFilter is used to filter issue queries

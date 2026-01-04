@@ -28,6 +28,12 @@ var closeCmd = &cobra.Command{
 		if reason == "" {
 			reason = "Closed"
 		}
+		outcomeStr, _ := cmd.Flags().GetString("outcome")
+		outcome := types.CloseOutcome(outcomeStr)
+		// Validate outcome if provided
+		if outcome != "" && !outcome.IsValid() {
+			FatalErrorRespectJSON("invalid outcome %q. Valid outcomes: completed, could-not-reproduce, duplicate, wont-fix, invalid", outcomeStr)
+		}
 		force, _ := cmd.Flags().GetBool("force")
 		continueFlag, _ := cmd.Flags().GetBool("continue")
 		noAuto, _ := cmd.Flags().GetBool("no-auto")
@@ -97,11 +103,12 @@ var closeCmd = &cobra.Command{
 					}
 				}
 
-				closeArgs := &rpc.CloseArgs{
-					ID:          id,
-					Reason:      reason,
-					SuggestNext: suggestNext,
-				}
+			closeArgs := &rpc.CloseArgs{
+				ID:          id,
+				Reason:      reason,
+				Outcome:     outcome,
+				SuggestNext: suggestNext,
+			}
 				resp, err := daemonClient.CloseIssue(closeArgs)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error closing %s: %v\n", id, err)
@@ -181,7 +188,7 @@ var closeCmd = &cobra.Command{
 				continue
 			}
 
-			if err := store.CloseIssue(ctx, id, reason, actor); err != nil {
+			if err := store.CloseIssue(ctx, id, reason, outcome, actor); err != nil {
 				fmt.Fprintf(os.Stderr, "Error closing %s: %v\n", id, err)
 				continue
 			}
@@ -255,6 +262,7 @@ func init() {
 	closeCmd.Flags().StringP("reason", "r", "", "Reason for closing")
 	closeCmd.Flags().String("resolution", "", "Alias for --reason (Jira CLI convention)")
 	_ = closeCmd.Flags().MarkHidden("resolution") // Hidden alias for agent/CLI ergonomics
+	closeCmd.Flags().StringP("outcome", "o", "", "Close outcome: completed, could-not-reproduce, duplicate, wont-fix, invalid")
 	closeCmd.Flags().BoolP("force", "f", false, "Force close (bypasses pinned and Phase: Complete checks)")
 	closeCmd.Flags().Bool("continue", false, "Auto-advance to next step in molecule")
 	closeCmd.Flags().Bool("no-auto", false, "With --continue, show next step but don't claim it")

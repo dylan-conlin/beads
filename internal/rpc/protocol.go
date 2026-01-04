@@ -147,9 +147,10 @@ type UpdateArgs struct {
 
 // CloseArgs represents arguments for the close operation
 type CloseArgs struct {
-	ID          string `json:"id"`
-	Reason      string `json:"reason,omitempty"`
-	SuggestNext bool   `json:"suggest_next,omitempty"` // Return newly unblocked issues (GH#679)
+	ID          string             `json:"id"`
+	Reason      string             `json:"reason,omitempty"`
+	Outcome     types.CloseOutcome `json:"outcome,omitempty"` // Close outcome category (completed, could-not-reproduce, etc.)
+	SuggestNext bool               `json:"suggest_next,omitempty"` // Return newly unblocked issues (GH#679)
 }
 
 // CloseResult is returned when SuggestNext is true (GH#679)

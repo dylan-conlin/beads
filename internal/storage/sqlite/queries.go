@@ -284,6 +284,8 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 	// Bug reproduction fields
 	var repro sql.NullString
 	var noReproReason sql.NullString
+	// Close outcome field
+	var closeOutcome sql.NullString
 
 	var contentHash sql.NullString
 	var compactedAtCommit sql.NullString
@@ -296,7 +298,7 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 		       sender, ephemeral, pinned, is_template,
 		       await_type, await_id, timeout_ns, waiters,
 		       hook_bead, role_bead, agent_state, last_activity, role_type, rig, mol_type,
-		       repro, no_repro_reason
+		       repro, no_repro_reason, close_outcome
 		FROM issues
 		WHERE id = ?
 	`, id).Scan(
@@ -309,7 +311,7 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 		&sender, &wisp, &pinned, &isTemplate,
 		&awaitType, &awaitID, &timeoutNs, &waiters,
 		&hookBead, &roleBead, &agentState, &lastActivity, &roleType, &rig, &molType,
-		&repro, &noReproReason,
+		&repro, &noReproReason, &closeOutcome,
 	)
 
 	if err == sql.ErrNoRows {
@@ -349,6 +351,9 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 	}
 	if closeReason.Valid {
 		issue.CloseReason = closeReason.String
+	}
+	if closeOutcome.Valid {
+		issue.CloseOutcome = types.CloseOutcome(closeOutcome.String)
 	}
 	issue.DeletedAt = parseNullableTimeString(deletedAt)
 	if deletedBy.Valid {
@@ -533,6 +538,8 @@ func (s *SQLiteStorage) GetIssueByExternalRef(ctx context.Context, externalRef s
 	var awaitID sql.NullString
 	var timeoutNs sql.NullInt64
 	var waiters sql.NullString
+	// Close outcome field
+	var closeOutcome sql.NullString
 
 	err := s.db.QueryRowContext(ctx, `
 		SELECT id, content_hash, title, description, design, acceptance_criteria, notes,
@@ -541,7 +548,7 @@ func (s *SQLiteStorage) GetIssueByExternalRef(ctx context.Context, externalRef s
 		       compaction_level, compacted_at, compacted_at_commit, original_size, source_repo, close_reason,
 		       deleted_at, deleted_by, delete_reason, original_type,
 		       sender, ephemeral, pinned, is_template,
-		       await_type, await_id, timeout_ns, waiters
+		       await_type, await_id, timeout_ns, waiters, close_outcome
 		FROM issues
 		WHERE external_ref = ?
 	`, externalRef).Scan(
@@ -552,7 +559,7 @@ func (s *SQLiteStorage) GetIssueByExternalRef(ctx context.Context, externalRef s
 		&issue.CompactionLevel, &compactedAt, &compactedAtCommit, &originalSize, &sourceRepo, &closeReason,
 		&deletedAt, &deletedBy, &deleteReason, &originalType,
 		&sender, &wisp, &pinned, &isTemplate,
-		&awaitType, &awaitID, &timeoutNs, &waiters,
+		&awaitType, &awaitID, &timeoutNs, &waiters, &closeOutcome,
 	)
 
 	if err == sql.ErrNoRows {
@@ -592,6 +599,9 @@ func (s *SQLiteStorage) GetIssueByExternalRef(ctx context.Context, externalRef s
 	}
 	if closeReason.Valid {
 		issue.CloseReason = closeReason.String
+	}
+	if closeOutcome.Valid {
+		issue.CloseOutcome = types.CloseOutcome(closeOutcome.String)
 	}
 	issue.DeletedAt = parseNullableTimeString(deletedAt)
 	if deletedBy.Valid {
@@ -1057,8 +1067,8 @@ func (s *SQLiteStorage) ResetCounter(ctx context.Context, prefix string) error {
 	return nil
 }
 
-// CloseIssue closes an issue with a reason
-func (s *SQLiteStorage) CloseIssue(ctx context.Context, id string, reason string, actor string) error {
+// CloseIssue closes an issue with a reason and optional outcome
+func (s *SQLiteStorage) CloseIssue(ctx context.Context, id string, reason string, outcome types.CloseOutcome, actor string) error {
 	now := time.Now()
 
 	// Update with special event handling
@@ -1072,10 +1082,11 @@ func (s *SQLiteStorage) CloseIssue(ctx context.Context, id string, reason string
 	// 1. issues.close_reason - for direct queries (bd show --json, exports)
 	// 2. events.comment - for audit history (when was it closed, by whom)
 	// Keep both in sync. If refactoring, consider deriving one from the other.
+	// close_outcome is stored alongside close_reason for categorizing closure type.
 	result, err := tx.ExecContext(ctx, `
-		UPDATE issues SET status = ?, closed_at = ?, updated_at = ?, close_reason = ?
+		UPDATE issues SET status = ?, closed_at = ?, updated_at = ?, close_reason = ?, close_outcome = ?
 		WHERE id = ?
-	`, types.StatusClosed, now, now, reason, id)
+	`, types.StatusClosed, now, now, reason, string(outcome), id)
 	if err != nil {
 		return fmt.Errorf("failed to close issue: %w", err)
 	}

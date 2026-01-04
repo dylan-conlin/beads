@@ -523,13 +523,14 @@ func applyUpdatesToIssue(issue *types.Issue, updates map[string]interface{}) {
 
 // CloseIssue closes an issue within the transaction.
 // NOTE: close_reason is stored in both issues table and events table - see SQLiteStorage.CloseIssue.
-func (t *sqliteTxStorage) CloseIssue(ctx context.Context, id string, reason string, actor string) error {
+// close_outcome is stored alongside close_reason for categorizing closure type.
+func (t *sqliteTxStorage) CloseIssue(ctx context.Context, id string, reason string, outcome types.CloseOutcome, actor string) error {
 	now := time.Now()
 
 	result, err := t.conn.ExecContext(ctx, `
-		UPDATE issues SET status = ?, closed_at = ?, updated_at = ?, close_reason = ?
+		UPDATE issues SET status = ?, closed_at = ?, updated_at = ?, close_reason = ?, close_outcome = ?
 		WHERE id = ?
-	`, types.StatusClosed, now, now, reason, id)
+	`, types.StatusClosed, now, now, reason, string(outcome), id)
 	if err != nil {
 		return fmt.Errorf("failed to close issue: %w", err)
 	}

@@ -50,6 +50,7 @@ var migrationsList = []Migration{
 	{"mol_type_column", migrations.MigrateMolTypeColumn},
 	{"hooked_status_migration", migrations.MigrateHookedStatus},
 	{"repro_columns", migrations.MigrateReproColumns},
+	{"close_outcome_column", migrations.MigrateCloseOutcomeColumn},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -106,6 +107,7 @@ func getMigrationDescription(name string) string {
 		"agent_fields":                 "Adds agent identity fields (hook_bead, role_bead, agent_state, etc.) for agent-as-bead pattern",
 		"mol_type_column":              "Adds mol_type column for molecule type classification (swarm/patrol/work)",
 		"repro_columns":                 "Adds repro and no_repro_reason columns for bug reproduction requirements",
+		"close_outcome_column":          "Adds close_outcome column for categorizing issue closure (e.g., could-not-reproduce)",
 	}
 
 	if desc, ok := descriptions[name]; ok {

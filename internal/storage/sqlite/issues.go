@@ -48,8 +48,8 @@ func insertIssue(ctx context.Context, conn *sql.Conn, issue *types.Issue) error 
 			deleted_at, deleted_by, delete_reason, original_type,
 			sender, ephemeral, pinned, is_template,
 			await_type, await_id, timeout_ns, waiters, mol_type,
-			repro, no_repro_reason
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			repro, no_repro_reason, close_outcome
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		issue.ID, issue.ContentHash, issue.Title, issue.Description, issue.Design,
 		issue.AcceptanceCriteria, issue.Notes, issue.Status,
@@ -60,7 +60,7 @@ func insertIssue(ctx context.Context, conn *sql.Conn, issue *types.Issue) error 
 		issue.Sender, wisp, pinned, isTemplate,
 		issue.AwaitType, issue.AwaitID, int64(issue.Timeout), formatJSONStringArray(issue.Waiters),
 		string(issue.MolType),
-		issue.Repro, issue.NoReproReason,
+		issue.Repro, issue.NoReproReason, string(issue.CloseOutcome),
 	)
 	if err != nil {
 		// INSERT OR IGNORE should handle duplicates, but driver may still return error
@@ -83,8 +83,8 @@ func insertIssues(ctx context.Context, conn *sql.Conn, issues []*types.Issue) er
 			deleted_at, deleted_by, delete_reason, original_type,
 			sender, ephemeral, pinned, is_template,
 			await_type, await_id, timeout_ns, waiters, mol_type,
-			repro, no_repro_reason
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			repro, no_repro_reason, close_outcome
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -120,7 +120,7 @@ func insertIssues(ctx context.Context, conn *sql.Conn, issues []*types.Issue) er
 			issue.Sender, wisp, pinned, isTemplate,
 			issue.AwaitType, issue.AwaitID, int64(issue.Timeout), formatJSONStringArray(issue.Waiters),
 			string(issue.MolType),
-			issue.Repro, issue.NoReproReason,
+			issue.Repro, issue.NoReproReason, string(issue.CloseOutcome),
 		)
 		if err != nil {
 			// INSERT OR IGNORE should handle duplicates, but driver may still return error
