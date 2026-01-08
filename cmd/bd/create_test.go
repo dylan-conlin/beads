@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -624,6 +625,64 @@ func TestCreateSuite(t *testing.T) {
 		}
 		if retrieved.NoReproReason != "" {
 			t.Errorf("expected empty no-repro reason for non-bug, got %q", retrieved.NoReproReason)
+		}
+	})
+
+	t.Run("EpicWithUnderstanding", func(t *testing.T) {
+		// Epic with understanding section should have it in description
+		understandingContent := "Problem: Users getting locked out. Prior failures: Rate limiting didn't work. Constraints: Must not break existing auth. Risks: Token expiry edge cases. Done: Zero lockouts in prod for 7 days."
+		issue := &types.Issue{
+			Title:       "Auth Overhaul Epic",
+			IssueType:   types.TypeEpic,
+			Priority:    1,
+			Status:      types.StatusOpen,
+			Description: "## Understanding\n\n" + understandingContent + "\n\n---\n\nDetailed epic description here.",
+			CreatedAt:   time.Now(),
+		}
+
+		if err := s.CreateIssue(ctx, issue, "test"); err != nil {
+			t.Fatalf("failed to create issue: %v", err)
+		}
+
+		retrieved, err := s.GetIssue(ctx, issue.ID)
+		if err != nil {
+			t.Fatalf("failed to get issue: %v", err)
+		}
+
+		// Check that description contains the understanding section marker
+		if !strings.Contains(retrieved.Description, "## Understanding") {
+			t.Errorf("expected description to contain '## Understanding', got %q", retrieved.Description)
+		}
+
+		// Check that the understanding content is preserved
+		if !strings.Contains(retrieved.Description, understandingContent) {
+			t.Errorf("expected description to contain understanding content")
+		}
+	})
+
+	t.Run("EpicWithoutUnderstanding", func(t *testing.T) {
+		// Epic without understanding section should have empty description or description without ## Understanding
+		issue := &types.Issue{
+			Title:       "Simple Epic",
+			IssueType:   types.TypeEpic,
+			Priority:    2,
+			Status:      types.StatusOpen,
+			Description: "Just a simple description without understanding section.",
+			CreatedAt:   time.Now(),
+		}
+
+		if err := s.CreateIssue(ctx, issue, "test"); err != nil {
+			t.Fatalf("failed to create issue: %v", err)
+		}
+
+		retrieved, err := s.GetIssue(ctx, issue.ID)
+		if err != nil {
+			t.Fatalf("failed to get issue: %v", err)
+		}
+
+		// Check that description does NOT contain the understanding section marker
+		if strings.Contains(retrieved.Description, "## Understanding") {
+			t.Errorf("expected description to NOT contain '## Understanding' for epic without understanding")
 		}
 	})
 }

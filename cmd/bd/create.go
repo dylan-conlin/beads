@@ -135,6 +135,10 @@ var createCmd = &cobra.Command{
 		noRepro, _ := cmd.Flags().GetBool("no-repro")
 		noReproReason, _ := cmd.Flags().GetString("reason")
 
+		// Epic understanding flags
+		understanding, _ := cmd.Flags().GetString("understanding")
+		noUnderstanding, _ := cmd.Flags().GetBool("no-understanding")
+
 		// Validate bug reproduction requirements
 		if issueType == "bug" {
 			if repro == "" && !noRepro {
@@ -158,6 +162,45 @@ var createCmd = &cobra.Command{
 			}
 			if noReproReason != "" && !noRepro {
 				FatalError("--reason flag requires --no-repro")
+			}
+		}
+
+		// Validate epic understanding requirements
+		if issueType == "epic" {
+			if understanding == "" && !noUnderstanding {
+				FatalError("--type=epic requires either --understanding 'model' or --no-understanding --reason 'why'\n" +
+					"  An epic is 'ready' when you can explain:\n" +
+					"    1. What problem we're solving (not symptoms)\n" +
+					"    2. Why previous approaches failed\n" +
+					"    3. What the key constraints are\n" +
+					"    4. Where the risks live\n" +
+					"    5. What 'done' looks like\n" +
+					"  Example: bd create --type epic 'Auth Overhaul' --understanding 'Problem: Users locked out after 3 fails...'\n" +
+					"  Example: bd create --type epic 'Quick Fix' --no-understanding --reason 'Single task, no model needed'")
+			}
+			// --no-understanding also uses --reason flag (shared with --no-repro)
+			if noUnderstanding && noReproReason == "" {
+				FatalError("--no-understanding requires --reason explaining why understanding is not needed")
+			}
+			if understanding != "" && noUnderstanding {
+				FatalError("cannot specify both --understanding and --no-understanding")
+			}
+			// Prepend understanding to description for epics
+			if understanding != "" {
+				understandingSection := "## Understanding\n\n" + understanding + "\n\n"
+				if description != "" {
+					description = understandingSection + "---\n\n" + description
+				} else {
+					description = understandingSection
+				}
+			}
+		} else {
+			// Validate understanding flags are not used with non-epic types
+			if understanding != "" {
+				FatalError("--understanding flag requires --type=epic")
+			}
+			if noUnderstanding {
+				FatalError("--no-understanding flag requires --type=epic")
 			}
 		}
 
@@ -197,7 +240,7 @@ var createCmd = &cobra.Command{
 			if err != nil {
 				debug.Logf("Warning: failed to detect user role: %v\n", err)
 			}
-			
+
 			routingConfig := &routing.RoutingConfig{
 				Mode:             config.GetString("routing.mode"),
 				DefaultRepo:      config.GetString("routing.default"),
@@ -205,10 +248,10 @@ var createCmd = &cobra.Command{
 				ContributorRepo:  config.GetString("routing.contributor"),
 				ExplicitOverride: repoOverride,
 			}
-			
+
 			repoPath = routing.DetermineTargetRepo(routingConfig, userRole, ".")
 		}
-		
+
 		// TODO(bd-6x6g): Switch to target repo for multi-repo support
 		// For now, we just log the target repo in debug mode
 		if repoPath != "." {
@@ -356,7 +399,7 @@ var createCmd = &cobra.Command{
 		}
 
 		ctx := rootCtx
-		
+
 		// Check if any dependencies are discovered-from type
 		// If so, inherit source_repo from the parent issue
 		var discoveredFromParentID string
@@ -365,16 +408,16 @@ var createCmd = &cobra.Command{
 			if depSpec == "" {
 				continue
 			}
-			
+
 			var depType types.DependencyType
 			var dependsOnID string
-			
+
 			if strings.Contains(depSpec, ":") {
 				parts := strings.SplitN(depSpec, ":", 2)
 				if len(parts) == 2 {
 					depType = types.DependencyType(strings.TrimSpace(parts[0]))
 					dependsOnID = strings.TrimSpace(parts[1])
-					
+
 					if depType == types.DepDiscoveredFrom && dependsOnID != "" {
 						discoveredFromParentID = dependsOnID
 						break
@@ -382,7 +425,7 @@ var createCmd = &cobra.Command{
 				}
 			}
 		}
-		
+
 		// If we found a discovered-from dependency, inherit source_repo from parent
 		if discoveredFromParentID != "" {
 			parentIssue, err := store.GetIssue(ctx, discoveredFromParentID)
@@ -391,7 +434,7 @@ var createCmd = &cobra.Command{
 			}
 			// If error getting parent or parent has no source_repo, continue with default
 		}
-		
+
 		if err := store.CreateIssue(ctx, issue, actor); err != nil {
 			FatalError("%v", err)
 		}
@@ -557,7 +600,10 @@ func init() {
 	// Bug reproduction flags (required for --type=bug)
 	createCmd.Flags().String("repro", "", "Bug reproduction steps/evidence (required for --type=bug)")
 	createCmd.Flags().Bool("no-repro", false, "Skip reproduction requirement (must provide --reason)")
-	createCmd.Flags().String("reason", "", "Reason why reproduction is not possible (requires --no-repro)")
+	createCmd.Flags().String("reason", "", "Reason why reproduction is not possible (requires --no-repro or --no-understanding)")
+	// Epic understanding flags (required for --type=epic)
+	createCmd.Flags().String("understanding", "", "Epic understanding model: problem, prior failures, constraints, risks, definition of done (required for --type=epic)")
+	createCmd.Flags().Bool("no-understanding", false, "Skip understanding requirement (must provide --reason)")
 	// Note: --json flag is defined as a persistent flag in main.go, not here
 	rootCmd.AddCommand(createCmd)
 }

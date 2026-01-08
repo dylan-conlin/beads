@@ -348,3 +348,76 @@ func TestReadyWorkUnassigned(t *testing.T) {
 		}
 	}
 }
+
+func TestHasUnderstandingSection(t *testing.T) {
+	t.Run("EpicWithUnderstanding", func(t *testing.T) {
+		issue := &types.Issue{
+			ID:          "test-epic-1",
+			Title:       "Test Epic",
+			IssueType:   types.TypeEpic,
+			Description: "## Understanding\n\nProblem: X. Constraints: Y. Done: Z.\n\n---\n\nMore details.",
+			Status:      types.StatusOpen,
+		}
+		if !hasUnderstandingSection(issue) {
+			t.Error("expected hasUnderstandingSection to return true for epic with Understanding section")
+		}
+	})
+
+	t.Run("EpicWithoutUnderstanding", func(t *testing.T) {
+		issue := &types.Issue{
+			ID:          "test-epic-2",
+			Title:       "Test Epic",
+			IssueType:   types.TypeEpic,
+			Description: "Just a regular description.",
+			Status:      types.StatusOpen,
+		}
+		if hasUnderstandingSection(issue) {
+			t.Error("expected hasUnderstandingSection to return false for epic without Understanding section")
+		}
+	})
+
+	t.Run("EpicWithEmptyDescription", func(t *testing.T) {
+		issue := &types.Issue{
+			ID:        "test-epic-3",
+			Title:     "Test Epic",
+			IssueType: types.TypeEpic,
+			Status:    types.StatusOpen,
+		}
+		if hasUnderstandingSection(issue) {
+			t.Error("expected hasUnderstandingSection to return false for epic with empty description")
+		}
+	})
+
+	t.Run("NonEpicAlwaysTrue", func(t *testing.T) {
+		// Non-epics should always return true (no warning needed)
+		task := &types.Issue{
+			ID:        "test-task",
+			Title:     "Test Task",
+			IssueType: types.TypeTask,
+			Status:    types.StatusOpen,
+		}
+		if !hasUnderstandingSection(task) {
+			t.Error("expected hasUnderstandingSection to return true for non-epic")
+		}
+
+		bug := &types.Issue{
+			ID:        "test-bug",
+			Title:     "Test Bug",
+			IssueType: types.TypeBug,
+			Status:    types.StatusOpen,
+		}
+		if !hasUnderstandingSection(bug) {
+			t.Error("expected hasUnderstandingSection to return true for non-epic")
+		}
+
+		feature := &types.Issue{
+			ID:        "test-feature",
+			Title:     "Test Feature",
+			IssueType: types.TypeFeature,
+			Status:    types.StatusOpen,
+		}
+		if !hasUnderstandingSection(feature) {
+			t.Error("expected hasUnderstandingSection to return true for non-epic")
+		}
+	})
+}
