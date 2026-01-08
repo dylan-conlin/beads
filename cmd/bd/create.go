@@ -160,8 +160,8 @@ var createCmd = &cobra.Command{
 			if noRepro {
 				FatalError("--no-repro flag requires --type=bug")
 			}
-			if noReproReason != "" && !noRepro {
-				FatalError("--reason flag requires --no-repro")
+			if noReproReason != "" && !noRepro && !noUnderstanding {
+				FatalError("--reason flag requires --no-repro or --no-understanding")
 			}
 		}
 
