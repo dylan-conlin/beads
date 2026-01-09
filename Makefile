@@ -13,7 +13,8 @@ INSTALL_DIR=$(HOME)/bin
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 SHORT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-LDFLAGS=-ldflags="-X main.Build=$(SHORT_COMMIT) -X main.Commit=$(COMMIT) -X main.Branch=$(BRANCH)"
+SOURCE_DIR ?= $(shell pwd)
+LDFLAGS=-ldflags="-X main.Build=$(SHORT_COMMIT) -X main.Commit=$(COMMIT) -X main.Branch=$(BRANCH) -X main.SourceDir=$(SOURCE_DIR)"
 
 .PHONY: all build test bench bench-quick clean install help
 

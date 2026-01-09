@@ -796,6 +796,10 @@ var rootCmd = &cobra.Command{
 }
 
 func main() {
+	// Check if binary is stale and auto-rebuild if needed
+	// This may replace the current process via syscall.Exec
+	maybeAutoRebuild()
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
