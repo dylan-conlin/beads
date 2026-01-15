@@ -164,7 +164,7 @@ func outputMCPContext(w io.Writer, stealthMode bool) error {
 	} else if noPush {
 		closeProtocol = "Before saying \"done\": git status → git add → bd sync → git commit (push disabled - run git push manually)"
 	} else {
-		closeProtocol = "Before saying \"done\": git status → git add → bd sync → git commit → bd sync → git push"
+		closeProtocol = "Before saying \"done\": git status → git add → bd sync → git commit → bd sync → ASK USER before push"
 	}
 
 	redirectNotice := getRedirectNotice(false)
@@ -244,8 +244,8 @@ bd sync                     # Sync beads (push disabled)
 [ ] 3. bd sync                 (commit beads changes)
 [ ] 4. git commit -m "..."     (commit code)
 [ ] 5. bd sync                 (commit any new beads changes)
-[ ] 6. git push                (push to remote)`
-		closeNote = "**NEVER skip this.** Work is not done until pushed."
+[ ] 6. ASK USER: Ready to push? (pushes can trigger deploys)`
+		closeNote = "**NEVER skip this.** Work is not done until committed. Push when ready to deploy."
 		syncSection = `### Sync & Collaboration
 - ` + "`bd sync`" + ` - Sync with git remote (run at session end)
 - ` + "`bd sync --status`" + ` - Check sync status without syncing`
