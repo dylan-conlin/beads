@@ -47,6 +47,14 @@ Config options:
 			os.Exit(0)
 		}
 
+		// Check if we're in a spawned context (SPAWN_CONTEXT.md exists)
+		// If so, skip output - SPAWN_CONTEXT.md is the authoritative source
+		// This prevents duplicate beads guidance in spawned agents
+		if isSpawnedContext() {
+			// Silent exit - same pattern as "not in beads project"
+			os.Exit(0)
+		}
+
 		// Detect MCP mode (unless overridden by flags)
 		mcpMode := isMCPActive()
 		if primeFullMode {
@@ -115,6 +123,16 @@ func isMCPActive() bool {
 	}
 
 	return false
+}
+
+// isSpawnedContext detects if we're running in a spawned agent context
+// by checking for SPAWN_CONTEXT.md in the current directory.
+// When present, SPAWN_CONTEXT.md is the authoritative source for beads guidance,
+// so bd prime should skip output to avoid duplication.
+func isSpawnedContext() bool {
+	// Check if SPAWN_CONTEXT.md exists in current working directory
+	_, err := os.Stat("SPAWN_CONTEXT.md")
+	return err == nil
 }
 
 // isEphemeralBranch detects if current branch has no upstream (ephemeral/local-only)

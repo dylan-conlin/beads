@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 )
@@ -87,6 +88,56 @@ func TestOutputContextFunction(t *testing.T) {
 				if strings.Contains(output, rejected) {
 					t.Errorf("Unexpected text found: %s", rejected)
 				}
+			}
+		})
+	}
+}
+
+func TestIsSpawnedContext(t *testing.T) {
+	tests := []struct {
+		name           string
+		createFile     bool
+		expectedResult bool
+	}{
+		{
+			name:           "SPAWN_CONTEXT.md exists",
+			createFile:     true,
+			expectedResult: true,
+		},
+		{
+			name:           "SPAWN_CONTEXT.md does not exist",
+			createFile:     false,
+			expectedResult: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create temp directory for test
+			tmpDir := t.TempDir()
+
+			// Change to temp directory
+			originalDir, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("Failed to get current directory: %v", err)
+			}
+			defer os.Chdir(originalDir)
+
+			if err := os.Chdir(tmpDir); err != nil {
+				t.Fatalf("Failed to change directory: %v", err)
+			}
+
+			// Create SPAWN_CONTEXT.md if test requires it
+			if tt.createFile {
+				if err := os.WriteFile("SPAWN_CONTEXT.md", []byte("test"), 0644); err != nil {
+					t.Fatalf("Failed to create SPAWN_CONTEXT.md: %v", err)
+				}
+			}
+
+			// Test isSpawnedContext
+			result := isSpawnedContext()
+			if result != tt.expectedResult {
+				t.Errorf("isSpawnedContext() = %v, want %v", result, tt.expectedResult)
 			}
 		})
 	}
