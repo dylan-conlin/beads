@@ -7,6 +7,7 @@ import (
 
 	"github.com/steveyegge/beads/internal/storage"
 	"github.com/steveyegge/beads/internal/types"
+	"github.com/steveyegge/beads/internal/validation"
 )
 
 func validateIssueUpdatable(id string, issue *types.Issue) error {
@@ -16,6 +17,42 @@ func validateIssueUpdatable(id string, issue *types.Issue) error {
 	if issue.IsTemplate {
 		return fmt.Errorf("Error: cannot update template %s: templates are read-only; use 'bd molecule instantiate' to create a work item", id)
 	}
+	return nil
+}
+
+// validateQuestionUpdate validates that updates are appropriate for question issues.
+// Questions have restricted status values (open, investigating, answered, closed)
+// and restricted field updates (no assignee, estimate).
+func validateQuestionUpdate(id string, issue *types.Issue, updates map[string]interface{}) error {
+	if issue == nil || issue.IssueType != types.TypeQuestion {
+		return nil
+	}
+
+	// Validate status updates for questions
+	if statusVal, ok := updates["status"]; ok {
+		var status types.Status
+		switch s := statusVal.(type) {
+		case string:
+			status = types.Status(s)
+		case types.Status:
+			status = s
+		default:
+			return fmt.Errorf("invalid status type: %T", statusVal)
+		}
+
+		if err := validation.ValidateQuestionStatus(status); err != nil {
+			return fmt.Errorf("Error: cannot update %s: %w", id, err)
+		}
+	}
+
+	// Validate that questions don't get assignee or estimate updates
+	if _, ok := updates["assignee"]; ok {
+		return fmt.Errorf("Error: cannot update %s: assignee is not applicable to questions", id)
+	}
+	if _, ok := updates["estimated_minutes"]; ok {
+		return fmt.Errorf("Error: cannot update %s: estimate is not applicable to questions", id)
+	}
+
 	return nil
 }
 

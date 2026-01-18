@@ -195,6 +195,66 @@ func TestValidatePrefix(t *testing.T) {
 	}
 }
 
+func TestIsValidQuestionStatus(t *testing.T) {
+	tests := []struct {
+		status types.Status
+		want   bool
+	}{
+		// Valid question statuses
+		{types.StatusOpen, true},
+		{types.StatusInvestigating, true},
+		{types.StatusAnswered, true},
+		{types.StatusClosed, true},
+
+		// Invalid question statuses
+		{types.StatusInProgress, false},
+		{types.StatusBlocked, false},
+		{types.StatusDeferred, false},
+		{types.StatusTombstone, false},
+		{types.StatusPinned, false},
+		{types.StatusHooked, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.status), func(t *testing.T) {
+			got := IsValidQuestionStatus(tt.status)
+			if got != tt.want {
+				t.Errorf("IsValidQuestionStatus(%q) = %v, want %v", tt.status, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateQuestionStatus(t *testing.T) {
+	tests := []struct {
+		status    types.Status
+		wantError bool
+	}{
+		// Valid question statuses
+		{types.StatusOpen, false},
+		{types.StatusInvestigating, false},
+		{types.StatusAnswered, false},
+		{types.StatusClosed, false},
+
+		// Invalid question statuses
+		{types.StatusInProgress, true},
+		{types.StatusBlocked, true},
+		{types.StatusDeferred, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.status), func(t *testing.T) {
+			err := ValidateQuestionStatus(tt.status)
+			if (err != nil) != tt.wantError {
+				t.Errorf("ValidateQuestionStatus(%q) error = %v, wantError %v", tt.status, err, tt.wantError)
+			}
+			if err != nil && !strings.Contains(err.Error(), "invalid status") {
+				t.Errorf("ValidateQuestionStatus(%q) error message should contain 'invalid status', got: %v", tt.status, err)
+			}
+		})
+	}
+}
+
 func TestValidateAgentID(t *testing.T) {
 	tests := []struct {
 		name          string

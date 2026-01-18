@@ -138,6 +138,35 @@ func isNamedRole(s string) bool {
 	return false
 }
 
+// ValidQuestionStatuses are the statuses allowed for question type issues.
+// Questions follow a specific lifecycle: open → investigating → answered → closed
+var ValidQuestionStatuses = []types.Status{
+	types.StatusOpen,
+	types.StatusInvestigating,
+	types.StatusAnswered,
+	types.StatusClosed,
+}
+
+// IsValidQuestionStatus checks if a status is valid for a question type issue.
+// Questions can only use: open, investigating, answered, closed
+func IsValidQuestionStatus(status types.Status) bool {
+	for _, s := range ValidQuestionStatuses {
+		if status == s {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateQuestionStatus validates that a status is appropriate for a question.
+// Returns nil if valid, or an error describing valid options if invalid.
+func ValidateQuestionStatus(status types.Status) error {
+	if IsValidQuestionStatus(status) {
+		return nil
+	}
+	return fmt.Errorf("invalid status %q for question (valid: open, investigating, answered, closed)", status)
+}
+
 // ValidateAgentID validates that an agent ID follows the expected pattern.
 // Canonical format: prefix-rig-role-name
 // Patterns:

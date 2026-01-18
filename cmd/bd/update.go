@@ -142,6 +142,23 @@ var updateCmd = &cobra.Command{
 		if daemonClient != nil {
 			updatedIssues := []*types.Issue{}
 			for _, id := range resolvedIDs {
+				// Fetch issue first to check type and validate updates
+				showArgs := &rpc.ShowArgs{ID: id}
+				showResp, showErr := daemonClient.Show(showArgs)
+				if showErr == nil {
+					var issue types.Issue
+					if json.Unmarshal(showResp.Data, &issue) == nil {
+						if err := validateIssueUpdatable(id, &issue); err != nil {
+							fmt.Fprintf(os.Stderr, "%s\n", err)
+							continue
+						}
+						if err := validateQuestionUpdate(id, &issue, updates); err != nil {
+							fmt.Fprintf(os.Stderr, "%s\n", err)
+							continue
+						}
+					}
+				}
+
 				updateArgs := &rpc.UpdateArgs{ID: id}
 
 				// Map updates to RPC args
@@ -231,6 +248,10 @@ var updateCmd = &cobra.Command{
 				continue
 			}
 			if err := validateIssueUpdatable(id, issue); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				continue
+			}
+			if err := validateQuestionUpdate(id, issue, updates); err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 				continue
 			}
