@@ -356,14 +356,16 @@ const (
 	StatusDeferred   Status = "deferred" // Deliberately put on ice for later
 	StatusClosed     Status = "closed"
 	StatusTombstone  Status = "tombstone" // Soft-deleted issue
-	StatusPinned     Status = "pinned"    // Persistent bead that stays open indefinitely
-	StatusHooked     Status = "hooked"    // Work attached to an agent's hook (GUPP)
+	StatusPinned        Status = "pinned"        // Persistent bead that stays open indefinitely
+	StatusHooked        Status = "hooked"        // Work attached to an agent's hook (GUPP)
+	StatusInvestigating Status = "investigating" // Question is being actively investigated
+	StatusAnswered      Status = "answered"      // Question has been answered (before formal close)
 )
 
 // IsValid checks if the status value is valid (built-in statuses only)
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusOpen, StatusInProgress, StatusBlocked, StatusDeferred, StatusClosed, StatusTombstone, StatusPinned, StatusHooked:
+	case StatusOpen, StatusInProgress, StatusBlocked, StatusDeferred, StatusClosed, StatusTombstone, StatusPinned, StatusHooked, StatusInvestigating, StatusAnswered:
 		return true
 	}
 	return false
@@ -402,12 +404,13 @@ const (
 	TypeAgent        IssueType = "agent"         // Agent identity bead
 	TypeRole         IssueType = "role"          // Agent role definition
 	TypeConvoy       IssueType = "convoy"        // Cross-project tracking with reactive completion
+	TypeQuestion     IssueType = "question"      // Strategic/architectural question requiring investigation
 )
 
 // IsValid checks if the issue type value is valid
 func (t IssueType) IsValid() bool {
 	switch t {
-	case TypeBug, TypeFeature, TypeTask, TypeEpic, TypeChore, TypeMessage, TypeMergeRequest, TypeMolecule, TypeGate, TypeAgent, TypeRole, TypeConvoy:
+	case TypeBug, TypeFeature, TypeTask, TypeEpic, TypeChore, TypeMessage, TypeMergeRequest, TypeMolecule, TypeGate, TypeAgent, TypeRole, TypeConvoy, TypeQuestion:
 		return true
 	}
 	return false

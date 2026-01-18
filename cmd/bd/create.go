@@ -204,6 +204,29 @@ var createCmd = &cobra.Command{
 			}
 		}
 
+		// Validate question type restrictions
+		if issueType == "question" {
+			// Questions don't have assignee, estimate, repro, or understanding
+			if assignee != "" {
+				FatalError("--assignee flag is not applicable to questions")
+			}
+			if cmd.Flags().Changed("estimate") {
+				FatalError("--estimate flag is not applicable to questions")
+			}
+			if repro != "" {
+				FatalError("--repro flag is not applicable to questions")
+			}
+			if noRepro {
+				FatalError("--no-repro flag is not applicable to questions")
+			}
+			if understanding != "" {
+				FatalError("--understanding flag is not applicable to questions")
+			}
+			if noUnderstanding {
+				FatalError("--no-understanding flag is not applicable to questions")
+			}
+		}
+
 		// Handle --rig or --prefix flag: create issue in a different rig
 		// Both flags use the same forgiving lookup (accepts rig names or prefixes)
 		targetRig := rigOverride
@@ -577,7 +600,7 @@ func init() {
 	createCmd.Flags().String("title", "", "Issue title (alternative to positional argument)")
 	createCmd.Flags().Bool("silent", false, "Output only the issue ID (for scripting)")
 	registerPriorityFlag(createCmd, "2")
-	createCmd.Flags().StringP("type", "t", "task", "Issue type (bug|feature|task|epic|chore|merge-request|molecule|gate|agent|role|convoy)")
+	createCmd.Flags().StringP("type", "t", "task", "Issue type (bug|feature|task|epic|chore|merge-request|molecule|gate|agent|role|convoy|question)")
 	registerCommonIssueFlags(createCmd)
 	createCmd.Flags().StringSliceP("labels", "l", []string{}, "Labels (comma-separated)")
 	createCmd.Flags().StringSlice("label", []string{}, "Alias for --labels")
