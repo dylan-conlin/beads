@@ -142,11 +142,12 @@ func (s *SQLiteStorage) rebuildBlockedCache(ctx context.Context, exec execer) er
 		  -- External refs (external:*) are excluded - they're resolved lazily by GetReadyWork
 		  blocked_directly AS (
 		    -- Regular 'blocks' dependencies: B blocked if A not closed
+		    -- Note: 'investigating' status blocks work (for questions that need answers)
 		    SELECT DISTINCT d.issue_id
 		    FROM dependencies d
 		    JOIN issues blocker ON d.depends_on_id = blocker.id
 		    WHERE d.type = 'blocks'
-		      AND blocker.status IN ('open', 'in_progress', 'blocked', 'deferred', 'hooked')
+		      AND blocker.status IN ('open', 'in_progress', 'blocked', 'deferred', 'hooked', 'investigating')
 
 		    UNION
 
@@ -159,8 +160,8 @@ func (s *SQLiteStorage) rebuildBlockedCache(ctx context.Context, exec execer) er
 		    JOIN issues blocker ON d.depends_on_id = blocker.id
 		    WHERE d.type = 'conditional-blocks'
 		      AND (
-		        -- A is not closed: B stays blocked
-		        blocker.status IN ('open', 'in_progress', 'blocked', 'deferred')
+		        -- A is not closed: B stays blocked (includes investigating for questions)
+		        blocker.status IN ('open', 'in_progress', 'blocked', 'deferred', 'investigating')
 		        OR
 		        -- A is closed but NOT with a failure: B stays blocked (condition not met)
 		        (blocker.status = 'closed' AND NOT (
