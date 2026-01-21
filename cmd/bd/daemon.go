@@ -288,6 +288,30 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	logF, log := setupDaemonLogger(logPath, logJSON, level)
 	defer func() { _ = logF.Close() }()
 
+	// FAIL-FAST: Refuse to start daemon in sandboxed environments.
+	// Sandboxes (like Claude Code) can't chmod the Unix socket, causing the daemon to
+	// fail after opening the database. Repeated open/close cycles corrupt the WAL file.
+	// This check MUST happen before any database operations.
+	// See: bd-07f8 for root cause analysis of sandbox-induced SQLite corruption.
+	if isSandboxed() {
+		log.Error("daemon cannot start in sandboxed environment")
+		log.Info("hint: sandboxed environments restrict process signaling and filesystem operations")
+		log.Info("hint: use direct mode instead (bd --sandbox or BEADS_NO_DAEMON=1)")
+
+		// Write error to file so user can see it without checking logs
+		if beadsDir, err := ensureBeadsDir(); err == nil {
+			errFile := filepath.Join(beadsDir, "daemon-error")
+			errMsg := "Daemon cannot start in sandboxed environment.\n\n" +
+				"Sandboxed environments (like Claude Code, Codex, or containers) restrict\n" +
+				"filesystem operations needed by the daemon. Use direct mode instead:\n\n" +
+				"  bd --sandbox <command>    # Single command\n" +
+				"  export BEADS_NO_DAEMON=1  # Persistent\n"
+			// nolint:gosec // G306: Error file needs to be readable for debugging
+			_ = os.WriteFile(errFile, []byte(errMsg), 0644)
+		}
+		return // Exit without opening database
+	}
+
 	// Set up signal-aware context for graceful shutdown
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()

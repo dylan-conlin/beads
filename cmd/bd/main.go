@@ -266,6 +266,29 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
+		// Auto-detect sandboxed environment EARLY (before any database or daemon operations)
+		// This MUST run before noDbCommands early return because daemon commands need sandbox detection
+		// to prevent SQLite corruption from rapid open/close cycles in sandboxed environments.
+		// See: bd-07f8 for root cause analysis of sandbox-induced WAL corruption.
+		if !cmd.Flags().Changed("sandbox") && !cmd.Flags().Changed("no-daemon") {
+			if isSandboxed() {
+				sandboxMode = true
+				debug.Logf("sandbox detected, enabling sandbox mode")
+			}
+		}
+
+		// If sandbox mode is set (via flag or auto-detection), enable all sandbox flags EARLY
+		// This prevents daemon auto-start and other operations that fail in sandboxed environments.
+		if sandboxMode {
+			noDaemon = true
+			noAutoFlush = true
+			noAutoImport = true
+			// Use shorter lock timeout in sandbox mode unless explicitly set
+			if !cmd.Flags().Changed("lock-timeout") {
+				lockTimeout = 100 * time.Millisecond
+			}
+		}
+
 		// Skip database initialization for commands that don't need a database
 		noDbCommands := []string{
 			cmdDaemon,
@@ -309,24 +332,10 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		// Auto-detect sandboxed environment (Phase 2 for GH #353)
-		// Only auto-enable if user hasn't explicitly set --sandbox or --no-daemon
-		if !cmd.Flags().Changed("sandbox") && !cmd.Flags().Changed("no-daemon") {
-			if isSandboxed() {
-				sandboxMode = true
-				fmt.Fprintf(os.Stderr, "ℹ️  Sandbox detected, using direct mode\n")
-			}
-		}
-
-		// If sandbox mode is set, enable all sandbox flags
-		if sandboxMode {
-			noDaemon = true
-			noAutoFlush = true
-			noAutoImport = true
-			// Use shorter lock timeout in sandbox mode unless explicitly set
-			if !cmd.Flags().Changed("lock-timeout") {
-				lockTimeout = 100 * time.Millisecond
-			}
+		// Emit sandbox notification for database-using commands (not for daemon - it fails early)
+		// This notification runs after noDbCommands early return, so daemon never reaches here.
+		if sandboxMode && !cmd.Flags().Changed("sandbox") {
+			fmt.Fprintf(os.Stderr, "ℹ️  Sandbox detected, using direct mode\n")
 		}
 
 		// Force direct mode for human-only interactive commands

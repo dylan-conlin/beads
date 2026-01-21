@@ -52,6 +52,15 @@ func shouldAutoStartDaemon() bool {
 		return false // Explicit opt-out
 	}
 
+	// Check for sandboxed environment - daemon cannot start in sandbox due to
+	// filesystem restrictions (chmod on Unix socket fails). Attempting to start
+	// causes SQLite corruption from rapid database open/close cycles.
+	// See: bd-07f8 for root cause analysis.
+	if isSandboxed() {
+		debug.Logf("daemon auto-start disabled: sandboxed environment detected")
+		return false
+	}
+
 	// Check if we're in a git worktree without sync-branch configured.
 	// In this case, daemon is unsafe because all worktrees share the same
 	// .beads directory and the daemon would commit to the wrong branch.
