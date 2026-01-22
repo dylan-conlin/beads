@@ -61,13 +61,20 @@ External references are stored as-is and resolved at query time using
 the external_projects config. They block the issue until the capability
 is "shipped" in the target project.
 
+Authority levels control who can traverse/resolve the dependency:
+  - daemon: Automated processes can resolve (default)
+  - orchestrator: Requires orchestrator judgment
+  - human: Requires human decision
+
 Examples:
   bd dep add bd-42 bd-41                              # Local dependency
-  bd dep add gt-xyz external:beads:mol-run-assignee   # Cross-project dependency`,
+  bd dep add gt-xyz external:beads:mol-run-assignee   # Cross-project dependency
+  bd dep add bd-xyz bd-abc --authority orchestrator   # Orchestrator-level dependency`,
 	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		CheckReadonly("dep add")
 		depType, _ := cmd.Flags().GetString("type")
+		authority, _ := cmd.Flags().GetString("authority")
 
 		ctx := rootCtx
 
@@ -148,9 +155,10 @@ Examples:
 		// If daemon is running, use RPC
 		if daemonClient != nil {
 			depArgs := &rpc.DepAddArgs{
-				FromID:  fromID,
-				ToID:    toID,
-				DepType: depType,
+				FromID:    fromID,
+				ToID:      toID,
+				DepType:   depType,
+				Authority: authority,
 			}
 
 			resp, err := daemonClient.AddDependency(depArgs)
@@ -163,8 +171,12 @@ Examples:
 				return
 			}
 
-			fmt.Printf("%s Added dependency: %s depends on %s (%s)\n",
-				ui.RenderPass("✓"), args[0], args[1], depType)
+			authorityStr := ""
+			if authority != "" && authority != "daemon" {
+				authorityStr = fmt.Sprintf(" [%s]", authority)
+			}
+			fmt.Printf("%s Added dependency: %s depends on %s (%s)%s\n",
+				ui.RenderPass("✓"), args[0], args[1], depType, authorityStr)
 			return
 		}
 
@@ -173,6 +185,7 @@ Examples:
 			IssueID:     fromID,
 			DependsOnID: toID,
 			Type:        types.DependencyType(depType),
+			Authority:   types.Authority(authority),
 		}
 
 		if err := store.AddDependency(ctx, dep, actor); err != nil {
@@ -206,18 +219,29 @@ Examples:
 			fmt.Fprintf(os.Stderr, "\nRun 'bd dep cycles' for detailed analysis.\n\n")
 		}
 
+		// Determine actual authority (default to daemon if not specified)
+		actualAuthority := authority
+		if actualAuthority == "" {
+			actualAuthority = "daemon"
+		}
+
 		if jsonOutput {
 			outputJSON(map[string]interface{}{
 				"status":        "added",
 				"issue_id":      fromID,
 				"depends_on_id": toID,
 				"type":          depType,
+				"authority":     actualAuthority,
 			})
 			return
 		}
 
-		fmt.Printf("%s Added dependency: %s depends on %s (%s)\n",
-			ui.RenderPass("✓"), fromID, toID, depType)
+		authorityStr := ""
+		if authority != "" && authority != "daemon" {
+			authorityStr = fmt.Sprintf(" [%s]", authority)
+		}
+		fmt.Printf("%s Added dependency: %s depends on %s (%s)%s\n",
+			ui.RenderPass("✓"), fromID, toID, depType, authorityStr)
 	},
 }
 
@@ -975,6 +999,7 @@ func ParseExternalRef(ref string) (project, capability string) {
 
 func init() {
 	depAddCmd.Flags().StringP("type", "t", "blocks", "Dependency type (blocks|tracks|related|parent-child|discovered-from)")
+	depAddCmd.Flags().StringP("authority", "a", "", "Authority level: daemon (default), orchestrator, or human")
 	// Note: --json flag is defined as a persistent flag in main.go, not here
 
 	// Note: --json flag is defined as a persistent flag in main.go, not here

@@ -286,6 +286,9 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 	var noReproReason sql.NullString
 	// Close outcome field
 	var closeOutcome sql.NullString
+	// Decidability fields
+	var resolutionType sql.NullString
+	var domain sql.NullString
 
 	var contentHash sql.NullString
 	var compactedAtCommit sql.NullString
@@ -298,7 +301,8 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 		       sender, ephemeral, pinned, is_template,
 		       await_type, await_id, timeout_ns, waiters,
 		       hook_bead, role_bead, agent_state, last_activity, role_type, rig, mol_type,
-		       repro, no_repro_reason, close_outcome
+		       repro, no_repro_reason, close_outcome,
+		       COALESCE(resolution_type, '') as resolution_type, COALESCE(domain, '') as domain
 		FROM issues
 		WHERE id = ?
 	`, id).Scan(
@@ -312,6 +316,7 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 		&awaitType, &awaitID, &timeoutNs, &waiters,
 		&hookBead, &roleBead, &agentState, &lastActivity, &roleType, &rig, &molType,
 		&repro, &noReproReason, &closeOutcome,
+		&resolutionType, &domain,
 	)
 
 	if err == sql.ErrNoRows {
@@ -422,6 +427,13 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id string) (*types.Issue, 
 	}
 	if noReproReason.Valid {
 		issue.NoReproReason = noReproReason.String
+	}
+	// Decidability fields
+	if resolutionType.Valid {
+		issue.ResolutionType = types.ResolutionType(resolutionType.String)
+	}
+	if domain.Valid {
+		issue.Domain = domain.String
 	}
 
 	// Fetch labels for this issue
@@ -682,6 +694,9 @@ var allowedUpdateFields = map[string]bool{
 	"rig":           true,
 	// Molecule type field
 	"mol_type": true,
+	// Decidability fields
+	"resolution_type": true,
+	"domain":          true,
 }
 
 // validatePriority validates a priority value

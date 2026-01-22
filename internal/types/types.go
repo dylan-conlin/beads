@@ -32,6 +32,16 @@ type Issue struct {
 	Priority  int       `json:"priority"` // No omitempty: 0 is valid (P0/critical)
 	IssueType IssueType `json:"issue_type,omitempty"`
 
+	// ===== Decidability Fields (substrate extensions) =====
+	// ResolutionType indicates how questions should be resolved:
+	// - factual: Can be answered by research/testing
+	// - judgment: Requires orchestrator/human judgment call
+	// - framing: Meta-question about how to think about a problem
+	ResolutionType ResolutionType `json:"resolution_type,omitempty"`
+	// Domain categorizes decisions for efficient frontier queries
+	// Examples: model-selection, spawn-architecture, api-design
+	Domain string `json:"domain,omitempty"`
+
 	// ===== Assignment =====
 	Assignee         string `json:"assignee,omitempty"`
 	EstimatedMinutes *int   `json:"estimated_minutes,omitempty"`
@@ -416,6 +426,33 @@ func (t IssueType) IsValid() bool {
 	return false
 }
 
+// ResolutionType indicates how a question should be resolved (decidability substrate)
+type ResolutionType string
+
+// Resolution type constants
+const (
+	// ResolutionFactual - Can be answered by research/testing
+	// Examples: "Does X work with Y?", "What is the performance of Z?"
+	ResolutionFactual ResolutionType = "factual"
+
+	// ResolutionJudgment - Requires orchestrator/human judgment call
+	// Examples: "Should we prioritize X or Y?", "Is this approach worth the complexity?"
+	ResolutionJudgment ResolutionType = "judgment"
+
+	// ResolutionFraming - Meta-question about how to think about a problem
+	// Examples: "How should we think about the X/Y tradeoff?", "What question should we be asking?"
+	ResolutionFraming ResolutionType = "framing"
+)
+
+// IsValid checks if the resolution type value is valid
+func (r ResolutionType) IsValid() bool {
+	switch r {
+	case ResolutionFactual, ResolutionJudgment, ResolutionFraming, "":
+		return true // empty is valid (optional field)
+	}
+	return false
+}
+
 // CloseOutcome categorizes how an issue was closed
 type CloseOutcome string
 
@@ -498,12 +535,43 @@ type Dependency struct {
 	Type        DependencyType `json:"type"`
 	CreatedAt   time.Time      `json:"created_at"`
 	CreatedBy   string         `json:"created_by,omitempty"`
+	// Authority indicates who can traverse/resolve this edge
+	// Used for decidability substrate: daemon can only traverse daemon-level edges
+	Authority Authority `json:"authority,omitempty"`
 	// Metadata contains type-specific edge data (JSON blob)
 	// Examples: similarity scores, approval details, skill proficiency
 	Metadata string `json:"metadata,omitempty"`
 	// ThreadID groups conversation edges for efficient thread queries
 	// For replies-to edges, this identifies the conversation root
 	ThreadID string `json:"thread_id,omitempty"`
+}
+
+// Authority indicates who can traverse or resolve a dependency edge
+// This enables hierarchical decidability: daemon-level work vs orchestrator vs human
+type Authority string
+
+// Authority level constants
+const (
+	// AuthorityDaemon indicates the dependency can be resolved by automated processes
+	// Examples: build tasks, tests, simple bug fixes with clear repro
+	AuthorityDaemon Authority = "daemon"
+
+	// AuthorityOrchestrator indicates the dependency requires orchestrator judgment
+	// Examples: architectural decisions, scope questions, priority conflicts
+	AuthorityOrchestrator Authority = "orchestrator"
+
+	// AuthorityHuman indicates the dependency requires human decision
+	// Examples: strategic choices, resource allocation, external approvals
+	AuthorityHuman Authority = "human"
+)
+
+// IsValid checks if the authority value is valid
+func (a Authority) IsValid() bool {
+	switch a {
+	case AuthorityDaemon, AuthorityOrchestrator, AuthorityHuman, "":
+		return true // empty is valid (defaults to daemon)
+	}
+	return false
 }
 
 // DependencyCounts holds counts for dependencies and dependents

@@ -299,9 +299,10 @@ type StaleArgs struct {
 
 // DepAddArgs represents arguments for adding a dependency
 type DepAddArgs struct {
-	FromID  string `json:"from_id"`
-	ToID    string `json:"to_id"`
-	DepType string `json:"dep_type"`
+	FromID    string `json:"from_id"`
+	ToID      string `json:"to_id"`
+	DepType   string `json:"dep_type"`
+	Authority string `json:"authority,omitempty"` // daemon, orchestrator, or human
 }
 
 // DepRemoveArgs represents arguments for removing a dependency

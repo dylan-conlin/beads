@@ -51,6 +51,8 @@ var migrationsList = []Migration{
 	{"hooked_status_migration", migrations.MigrateHookedStatus},
 	{"repro_columns", migrations.MigrateReproColumns},
 	{"close_outcome_column", migrations.MigrateCloseOutcomeColumn},
+	{"authority_column", migrations.MigrateAuthorityColumn},
+	{"resolution_type_domain_columns", migrations.MigrateResolutionTypeDomainColumns},
 }
 
 // MigrationInfo contains metadata about a migration for inspection
@@ -107,7 +109,9 @@ func getMigrationDescription(name string) string {
 		"agent_fields":                 "Adds agent identity fields (hook_bead, role_bead, agent_state, etc.) for agent-as-bead pattern",
 		"mol_type_column":              "Adds mol_type column for molecule type classification (swarm/patrol/work)",
 		"repro_columns":                 "Adds repro and no_repro_reason columns for bug reproduction requirements",
-		"close_outcome_column":          "Adds close_outcome column for categorizing issue closure (e.g., could-not-reproduce)",
+		"close_outcome_column":           "Adds close_outcome column for categorizing issue closure (e.g., could-not-reproduce)",
+		"authority_column":               "Adds authority column to dependencies table for decidability substrate (daemon/orchestrator/human)",
+		"resolution_type_domain_columns": "Adds resolution_type and domain columns for decidability substrate (question categorization, decision domains)",
 	}
 
 	if desc, ok := descriptions[name]; ok {

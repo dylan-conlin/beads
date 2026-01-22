@@ -140,11 +140,21 @@ func (s *SQLiteStorage) AddDependency(ctx context.Context, dep *types.Dependency
 			}
 		}
 
-	// Insert dependency (including metadata and thread_id for edge consolidation - Decision 004)
+	// Set default authority if not specified
+	if dep.Authority == "" {
+		dep.Authority = types.AuthorityDaemon
+	}
+
+	// Validate authority
+	if !dep.Authority.IsValid() {
+		return fmt.Errorf("invalid authority: %q (must be daemon, orchestrator, or human)", dep.Authority)
+	}
+
+	// Insert dependency (including metadata, thread_id, and authority for decidability substrate)
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by, metadata, thread_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy, dep.Metadata, dep.ThreadID)
+		INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by, metadata, thread_id, authority)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy, dep.Metadata, dep.ThreadID, dep.Authority)
 	if err != nil {
 		return fmt.Errorf("failed to add dependency: %w", err)
 	}
@@ -396,7 +406,8 @@ func (s *SQLiteStorage) GetDependencyCounts(ctx context.Context, issueIDs []stri
 func (s *SQLiteStorage) GetDependencyRecords(ctx context.Context, issueID string) ([]*types.Dependency, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT issue_id, depends_on_id, type, created_at, created_by,
-		       COALESCE(metadata, '{}') as metadata, COALESCE(thread_id, '') as thread_id
+		       COALESCE(metadata, '{}') as metadata, COALESCE(thread_id, '') as thread_id,
+		       COALESCE(authority, 'daemon') as authority
 		FROM dependencies
 		WHERE issue_id = ?
 		ORDER BY created_at ASC
@@ -417,6 +428,7 @@ func (s *SQLiteStorage) GetDependencyRecords(ctx context.Context, issueID string
 			&dep.CreatedBy,
 			&dep.Metadata,
 			&dep.ThreadID,
+			&dep.Authority,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan dependency: %w", err)
@@ -432,7 +444,8 @@ func (s *SQLiteStorage) GetDependencyRecords(ctx context.Context, issueID string
 func (s *SQLiteStorage) GetAllDependencyRecords(ctx context.Context) (map[string][]*types.Dependency, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT issue_id, depends_on_id, type, created_at, created_by,
-		       COALESCE(metadata, '{}') as metadata, COALESCE(thread_id, '') as thread_id
+		       COALESCE(metadata, '{}') as metadata, COALESCE(thread_id, '') as thread_id,
+		       COALESCE(authority, 'daemon') as authority
 		FROM dependencies
 		ORDER BY issue_id, created_at ASC
 	`)
@@ -453,6 +466,7 @@ func (s *SQLiteStorage) GetAllDependencyRecords(ctx context.Context) (map[string
 			&dep.CreatedBy,
 			&dep.Metadata,
 			&dep.ThreadID,
+			&dep.Authority,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan dependency: %w", err)

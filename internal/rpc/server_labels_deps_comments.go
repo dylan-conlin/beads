@@ -53,6 +53,7 @@ func (s *Server) handleDepAdd(req *Request) Response {
 		IssueID:     depArgs.FromID,
 		DependsOnID: depArgs.ToID,
 		Type:        types.DependencyType(depArgs.DepType),
+		Authority:   types.Authority(depArgs.Authority),
 	}
 
 	ctx := s.reqCtx(req)
