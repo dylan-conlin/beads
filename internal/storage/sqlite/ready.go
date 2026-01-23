@@ -177,7 +177,112 @@ func (s *SQLiteStorage) GetReadyWork(ctx context.Context, filter types.WorkFilte
 		}
 	}
 
+	// Filter by authority level on blocking dependencies
+	// Only returns issues where all blocking dependencies have authority <= requested level
+	if filter.Authority != "" && len(issues) > 0 {
+		issues, err = s.filterByAuthority(ctx, issues, filter.Authority)
+		if err != nil {
+			return nil, fmt.Errorf("failed to filter by authority: %w", err)
+		}
+	}
+
 	return issues, nil
+}
+
+// authorityLevel returns the numeric level for an authority string.
+// Higher numbers mean more restricted (requires higher authority).
+// Empty string defaults to daemon (level 0).
+func authorityLevel(auth types.Authority) int {
+	switch auth {
+	case types.AuthorityDaemon, "":
+		return 0
+	case types.AuthorityOrchestrator:
+		return 1
+	case types.AuthorityHuman:
+		return 2
+	default:
+		return 0 // Default to daemon
+	}
+}
+
+// filterByAuthority removes issues that have blocking dependencies requiring higher authority.
+// The authority filter works by comparing the maximum authority level of all blocking
+// dependencies against the requested level:
+//   - daemon: Only issues where all blocking deps have authority=daemon (or empty)
+//   - orchestrator: Issues where all blocking deps have authority<=orchestrator
+//   - human: All issues (no filtering)
+func (s *SQLiteStorage) filterByAuthority(ctx context.Context, issues []*types.Issue, maxAuthority types.Authority) ([]*types.Issue, error) {
+	if len(issues) == 0 {
+		return issues, nil
+	}
+
+	// If authority is human, no filtering needed (human can traverse all edges)
+	if maxAuthority == types.AuthorityHuman {
+		return issues, nil
+	}
+
+	maxLevel := authorityLevel(maxAuthority)
+
+	// Build list of issue IDs
+	issueIDs := make([]string, len(issues))
+	for i, issue := range issues {
+		issueIDs[i] = issue.ID
+	}
+
+	// Query: get max authority level for blocking deps of each issue
+	// Only consider 'blocks' and 'parent-child' dependencies (the ones that affect ready work)
+	placeholders := make([]string, len(issueIDs))
+	args := make([]interface{}, len(issueIDs))
+	for i, id := range issueIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	// #nosec G201 -- placeholders are "?" literals, not user input
+	query := fmt.Sprintf(`
+		SELECT issue_id, COALESCE(MAX(
+			CASE authority
+				WHEN 'human' THEN 2
+				WHEN 'orchestrator' THEN 1
+				ELSE 0
+			END
+		), 0) as max_authority
+		FROM dependencies
+		WHERE issue_id IN (%s)
+		  AND type IN ('blocks', 'parent-child')
+		GROUP BY issue_id
+	`, strings.Join(placeholders, ","))
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query dependency authority: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Build map of issue ID -> max authority level
+	issueMaxAuth := make(map[string]int)
+	for rows.Next() {
+		var issueID string
+		var maxAuth int
+		if err := rows.Scan(&issueID, &maxAuth); err != nil {
+			return nil, fmt.Errorf("failed to scan authority: %w", err)
+		}
+		issueMaxAuth[issueID] = maxAuth
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Filter out issues where max authority exceeds the requested level
+	result := make([]*types.Issue, 0, len(issues))
+	for _, issue := range issues {
+		issueAuth := issueMaxAuth[issue.ID] // Default 0 if not in map (no deps)
+		if issueAuth <= maxLevel {
+			result = append(result, issue)
+		}
+	}
+
+	return result, nil
 }
 
 // filterByExternalDeps removes issues that have unsatisfied external dependencies.

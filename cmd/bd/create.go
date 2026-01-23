@@ -125,9 +125,21 @@ var createCmd = &cobra.Command{
 		roleType, _ := cmd.Flags().GetString("role-type")
 		agentRig, _ := cmd.Flags().GetString("agent-rig")
 
+		// Decidability fields
+		resolutionType, _ := cmd.Flags().GetString("resolution-type")
+		domain, _ := cmd.Flags().GetString("domain")
+
 		// Validate agent-specific flags require --type=agent
 		if (roleType != "" || agentRig != "") && issueType != "agent" {
 			FatalError("--role-type and --agent-rig flags require --type=agent")
+		}
+
+		// Validate resolution-type if provided
+		if resolutionType != "" {
+			rt := types.ResolutionType(resolutionType)
+			if !rt.IsValid() {
+				FatalError("invalid resolution-type %q (must be factual, judgment, or framing)", resolutionType)
+			}
 		}
 
 		// Bug reproduction flags
@@ -368,6 +380,8 @@ var createCmd = &cobra.Command{
 				Rig:                agentRig,
 				Repro:              repro,
 				NoReproReason:      noReproReason,
+				ResolutionType:     resolutionType,
+				Domain:             domain,
 			}
 
 			resp, err := daemonClient.Create(createArgs)
@@ -419,6 +433,8 @@ var createCmd = &cobra.Command{
 			Rig:                agentRig,
 			Repro:              repro,
 			NoReproReason:      noReproReason,
+			ResolutionType:     types.ResolutionType(resolutionType),
+			Domain:             domain,
 		}
 
 		ctx := rootCtx
@@ -627,6 +643,9 @@ func init() {
 	// Epic understanding flags (required for --type=epic)
 	createCmd.Flags().String("understanding", "", "Epic understanding model: problem, prior failures, constraints, risks, definition of done (required for --type=epic)")
 	createCmd.Flags().Bool("no-understanding", false, "Skip understanding requirement (must provide --reason)")
+	// Decidability fields (substrate extensions)
+	createCmd.Flags().String("resolution-type", "", "How the issue should be resolved: factual, judgment, or framing")
+	createCmd.Flags().String("domain", "", "Categorizes decisions for efficient frontier queries (e.g., model-selection, spawn-architecture)")
 	// Note: --json flag is defined as a persistent flag in main.go, not here
 	rootCmd.AddCommand(createCmd)
 }

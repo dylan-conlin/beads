@@ -103,6 +103,9 @@ type CreateArgs struct {
 	// Agent identity fields (only valid when IssueType == "agent")
 	RoleType string `json:"role_type,omitempty"` // polecat|crew|witness|refinery|mayor|deacon
 	Rig      string `json:"rig,omitempty"`       // Rig name (empty for town-level agents)
+	// Decidability fields (substrate extensions)
+	ResolutionType string `json:"resolution_type,omitempty"` // factual, judgment, or framing
+	Domain         string `json:"domain,omitempty"`          // Categorizes decisions for frontier queries
 }
 
 // UpdateArgs represents arguments for the update operation
@@ -283,6 +286,7 @@ type ReadyArgs struct {
 	LabelsAny  []string `json:"labels_any,omitempty"`
 	ParentID   string   `json:"parent_id,omitempty"` // Filter to descendants of this bead/epic
 	MolType    string   `json:"mol_type,omitempty"`  // Filter by molecule type: swarm, patrol, or work
+	Authority  string   `json:"authority,omitempty"` // Filter by max authority level: daemon, orchestrator, or human
 }
 
 // BlockedArgs represents arguments for the blocked operation

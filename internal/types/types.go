@@ -886,6 +886,11 @@ type WorkFilter struct {
 
 	// Molecule type filtering
 	MolType *MolType // Filter by molecule type (nil = any, swarm/patrol/work)
+
+	// Authority filtering: filter by maximum authority level on blocking dependencies
+	// Only returns issues where all blocking dependencies have authority <= this level
+	// Values: daemon (only daemon-level work), orchestrator (daemon + orchestrator), human (all)
+	Authority Authority
 }
 
 // StaleFilter is used to filter stale issue queries

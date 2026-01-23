@@ -211,6 +211,9 @@ func (s *Server) handleCreate(req *Request) Response {
 		// Bug reproduction fields
 		Repro:         createArgs.Repro,
 		NoReproReason: createArgs.NoReproReason,
+		// Decidability fields
+		ResolutionType: types.ResolutionType(createArgs.ResolutionType),
+		Domain:         createArgs.Domain,
 	}
 	
 	// Check if any dependencies are discovered-from type
@@ -1505,6 +1508,9 @@ func (s *Server) handleReady(req *Request) Response {
 	if readyArgs.MolType != "" {
 		molType := types.MolType(readyArgs.MolType)
 		wf.MolType = &molType
+	}
+	if readyArgs.Authority != "" {
+		wf.Authority = types.Authority(readyArgs.Authority)
 	}
 
 	ctx := s.reqCtx(req)

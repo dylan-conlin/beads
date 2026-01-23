@@ -62,6 +62,15 @@ This is useful for agents executing molecules to see which steps can run next.`,
 			}
 			molType = &mt
 		}
+		authorityStr, _ := cmd.Flags().GetString("authority")
+		var authority types.Authority
+		if authorityStr != "" {
+			authority = types.Authority(authorityStr)
+			if !authority.IsValid() {
+				fmt.Fprintf(os.Stderr, "Error: invalid authority %q (must be daemon, orchestrator, or human)\n", authorityStr)
+				os.Exit(1)
+			}
+		}
 		// Use global jsonOutput set by PersistentPreRun (respects config.yaml + env vars)
 
 		// Normalize labels: trim, dedupe, remove empty
@@ -98,6 +107,9 @@ This is useful for agents executing molecules to see which steps can run next.`,
 		if molType != nil {
 			filter.MolType = molType
 		}
+		if authority != "" {
+			filter.Authority = authority
+		}
 		// Validate sort policy
 		if !filter.SortPolicy.IsValid() {
 			fmt.Fprintf(os.Stderr, "Error: invalid sort policy '%s'. Valid values: hybrid, priority, oldest\n", sortPolicy)
@@ -115,6 +127,7 @@ This is useful for agents executing molecules to see which steps can run next.`,
 				LabelsAny:  labelsAny,
 				ParentID:   parentID,
 				MolType:    molTypeStr,
+				Authority:  authorityStr,
 			}
 			if cmd.Flags().Changed("priority") {
 				priority, _ := cmd.Flags().GetInt("priority")
@@ -456,6 +469,7 @@ func init() {
 	readyCmd.Flags().String("mol", "", "Filter to steps within a specific molecule")
 	readyCmd.Flags().String("parent", "", "Filter to descendants of this bead/epic")
 	readyCmd.Flags().String("mol-type", "", "Filter by molecule type: swarm, patrol, or work")
+	readyCmd.Flags().String("authority", "", "Filter by max authority level on blocking deps: daemon, orchestrator, or human")
 	rootCmd.AddCommand(readyCmd)
 	blockedCmd.Flags().String("parent", "", "Filter to descendants of this bead/epic")
 	rootCmd.AddCommand(blockedCmd)
