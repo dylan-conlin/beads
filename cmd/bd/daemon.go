@@ -288,6 +288,30 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	logF, log := setupDaemonLogger(logPath, logJSON, level)
 	defer func() { _ = logF.Close() }()
 
+	// Determine beads directory early for backoff check (before any operations)
+	var beadsDir string
+	if beadsDir, _ = ensureBeadsDir(); beadsDir == "" {
+		if foundDB := beads.FindDatabasePath(); foundDB != "" {
+			beadsDir = filepath.Dir(foundDB)
+		}
+	}
+
+	// LAYER 1: Restart Backoff - Prevent rapid restart loops that corrupt SQLite WAL.
+	// This check MUST happen FIRST, before any database or filesystem operations.
+	// See: orch-go decision 2026-01-22-beads-daemon-rapid-restart-prevention.md
+	if beadsDir != "" {
+		if canStart, backoffRemaining := CanStartDaemon(beadsDir); !canStart {
+			log.Warn("daemon start blocked by backoff",
+				"backoff_remaining", backoffRemaining.Round(time.Second).String(),
+				"reason", "preventing rapid restart loop")
+			log.Info("hint: wait for backoff to expire or manually clear .beads/daemon-start-state.json")
+			return // Exit without any operations
+		}
+		// Record this start attempt (before any operations that could fail)
+		RecordDaemonStartAttempt(beadsDir)
+	}
+
+	// LAYER 2: Pre-flight Validation - Fail fast before opening database.
 	// FAIL-FAST: Refuse to start daemon in sandboxed environments.
 	// Sandboxes (like Claude Code) can't chmod the Unix socket, causing the daemon to
 	// fail after opening the database. Repeated open/close cycles corrupt the WAL file.
@@ -298,8 +322,13 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 		log.Info("hint: sandboxed environments restrict process signaling and filesystem operations")
 		log.Info("hint: use direct mode instead (bd --sandbox or BEADS_NO_DAEMON=1)")
 
+		// Record failure for backoff
+		if beadsDir != "" {
+			RecordDaemonStartFailure(beadsDir, "sandboxed environment")
+		}
+
 		// Write error to file so user can see it without checking logs
-		if beadsDir, err := ensureBeadsDir(); err == nil {
+		if beadsDir != "" {
 			errFile := filepath.Join(beadsDir, "daemon-error")
 			errMsg := "Daemon cannot start in sandboxed environment.\n\n" +
 				"Sandboxed environments (like Claude Code, Codex, or containers) restrict\n" +
@@ -360,12 +389,18 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 		} else {
 			log.Error("no beads database found")
 			log.Info("hint: run 'bd init' to create a database or set BEADS_DB environment variable")
+			if beadsDir != "" {
+				RecordDaemonStartFailure(beadsDir, "no beads database found")
+			}
 			return // Use return instead of os.Exit to allow defers to run
 		}
 	}
 
 	lock, err := setupDaemonLock(pidFile, daemonDBPath, log)
 	if err != nil {
+		if beadsDir != "" {
+			RecordDaemonStartFailure(beadsDir, "lock acquisition failed: "+err.Error())
+		}
 		return // Use return instead of os.Exit to allow defers to run
 	}
 	defer func() { _ = lock.Close() }()
@@ -378,7 +413,9 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	}
 
 	// Check for multiple .db files (ambiguity error)
-	beadsDir := filepath.Dir(daemonDBPath)
+	// Note: beadsDir is already set at the top of runDaemonLoop, but update it here
+	// to ensure it's accurate after daemonDBPath is confirmed.
+	beadsDir = filepath.Dir(daemonDBPath)
 
 	// Reset backoff on daemon start (fresh start, but preserve NeedsManualSync hint)
 	if !localMode {
@@ -413,6 +450,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 				log.Warn("could not write daemon-error file", "error", err)
 			}
 
+			RecordDaemonStartFailure(beadsDir, "multiple database files found")
 			return // Use return instead of os.Exit to allow defers to run
 		}
 	}
@@ -422,6 +460,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	if dbBaseName != beads.CanonicalDatabaseName {
 		log.Error("non-canonical database name", "name", dbBaseName, "expected", beads.CanonicalDatabaseName)
 		log.Info("run 'bd init' to migrate to canonical name")
+		RecordDaemonStartFailure(beadsDir, "non-canonical database name: "+dbBaseName)
 		return // Use return instead of os.Exit to allow defers to run
 	}
 
@@ -436,6 +475,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	store, err := sqlite.New(ctx, daemonDBPath)
 	if err != nil {
 		log.Error("cannot open database", "error", err)
+		RecordDaemonStartFailure(beadsDir, "cannot open database: "+err.Error())
 		return // Use return instead of os.Exit to allow defers to run
 	}
 	defer func() { _ = store.Close() }()
@@ -459,6 +499,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	// Hydrate from multi-repo if configured
 	if results, err := store.HydrateFromMultiRepo(ctx); err != nil {
 		log.Error("multi-repo hydration failed", "error", err)
+		RecordDaemonStartFailure(beadsDir, "multi-repo hydration failed: "+err.Error())
 		return // Use return instead of os.Exit to allow defers to run
 	} else if results != nil {
 		log.Info("multi-repo hydration complete")
@@ -473,6 +514,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	} else if err := validateDatabaseFingerprint(ctx, store, &log); err != nil {
 		if os.Getenv("BEADS_IGNORE_REPO_MISMATCH") != "1" {
 			log.Error("repository fingerprint validation failed", "error", err)
+			RecordDaemonStartFailure(beadsDir, "fingerprint validation failed: "+err.Error())
 			return // Use return instead of os.Exit to allow defers to run
 		}
 		log.Warn("repository mismatch ignored (BEADS_IGNORE_REPO_MISMATCH=1)")
@@ -483,6 +525,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 	dbVersion, err := store.GetMetadata(versionCtx, "bd_version")
 	if err != nil && err.Error() != "metadata key not found: bd_version" {
 		log.Error("failed to read database version", "error", err)
+		RecordDaemonStartFailure(beadsDir, "failed to read database version: "+err.Error())
 		return // Use return instead of os.Exit to allow defers to run
 	}
 
@@ -497,6 +540,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 
 			// Allow override via environment variable for emergencies
 			if os.Getenv("BEADS_IGNORE_VERSION_MISMATCH") != "1" {
+				RecordDaemonStartFailure(beadsDir, "failed to update database version: "+err.Error())
 				return // Use return instead of os.Exit to allow defers to run
 			}
 			log.Warn("proceeding despite version update failure (BEADS_IGNORE_VERSION_MISMATCH=1)")
@@ -508,6 +552,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 		log.Warn("database missing version metadata", "setting_to", Version)
 		if err := store.SetMetadata(versionCtx, "bd_version", Version); err != nil {
 			log.Error("failed to set database version", "error", err)
+			RecordDaemonStartFailure(beadsDir, "failed to set database version: "+err.Error())
 			return // Use return instead of os.Exit to allow defers to run
 		}
 	}
@@ -521,6 +566,7 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 
 	server, serverErrChan, err := startRPCServer(serverCtx, socketPath, store, workspacePath, daemonDBPath, log)
 	if err != nil {
+		RecordDaemonStartFailure(beadsDir, "RPC server start failed: "+err.Error())
 		return
 	}
 
@@ -561,6 +607,13 @@ func runDaemonLoop(interval time.Duration, autoCommit, autoPush, autoPull, local
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+
+	// LAYER 1 SUCCESS: Daemon started successfully - clear backoff state.
+	// This indicates all pre-flight checks passed and daemon is fully operational.
+	if beadsDir != "" {
+		RecordDaemonStartSuccess(beadsDir)
+		log.Info("daemon start backoff cleared - startup successful")
+	}
 
 	// Create sync function based on mode
 	var doSync func()

@@ -181,8 +181,18 @@ func isDaemonRunningQuiet(pidFile string) bool {
 // tryAutoStartDaemon attempts to start the daemon in the background
 // Returns true if daemon was started successfully and socket is ready
 func tryAutoStartDaemon(socketPath string) bool {
+	// Check in-memory backoff first (fast path)
 	if !canRetryDaemonStart() {
-		debugLog("skipping auto-start due to recent failures")
+		debugLog("skipping auto-start due to recent failures (in-memory backoff)")
+		return false
+	}
+
+	// Check persistent backoff state (survives process restarts)
+	// This prevents rapid restart loops that cause SQLite WAL corruption.
+	// See: orch-go decision 2026-01-22-beads-daemon-rapid-restart-prevention.md
+	beadsDir := filepath.Dir(socketPath)
+	if canStart, backoffRemaining := CanStartDaemon(beadsDir); !canStart {
+		debugLog("skipping auto-start due to persistent backoff (remaining: %v)", backoffRemaining)
 		return false
 	}
 
@@ -304,9 +314,13 @@ func startDaemonProcess(socketPath string) bool {
 		cmd.Dir = filepath.Dir(dbPath)
 	}
 
+	beadsDir := filepath.Dir(socketPath)
+
 	configureDaemonProcessFn(cmd)
 	if err := cmd.Start(); err != nil {
 		recordDaemonStartFailure()
+		// Also record to persistent state for backoff across process restarts
+		RecordDaemonStartFailure(beadsDir, "failed to start daemon process: "+err.Error())
 		debugLog("failed to start daemon: %v", err)
 		return false
 	}
@@ -315,10 +329,16 @@ func startDaemonProcess(socketPath string) bool {
 
 	if waitForSocketReadinessFn(socketPath, 5*time.Second) {
 		recordDaemonStartSuccess()
+		// Note: We don't clear persistent state here because the daemon process
+		// itself clears it when it successfully starts. If we get here, the daemon
+		// is healthy, so its state should already be cleared.
 		return true
 	}
 
 	recordDaemonStartFailure()
+	// Also record to persistent state - daemon process may have failed silently
+	// (the daemon's own failure recording may not have happened if it crashed)
+	RecordDaemonStartFailure(beadsDir, "daemon socket not ready after 5s")
 	debugLog("daemon socket not ready after 5 seconds")
 	// Emit visible warning so user understands why command was slow
 	fmt.Fprintf(os.Stderr, "%s Daemon took too long to start (>5s). Running in direct mode.\n", ui.RenderWarn("Warning:"))

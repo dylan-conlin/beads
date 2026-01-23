@@ -21,6 +21,7 @@ daemon.log
 daemon.pid
 bd.sock
 sync-state.json
+daemon-start-state.json
 
 # Local version tracking (prevents upgrade notification spam after git ops)
 .local_version
