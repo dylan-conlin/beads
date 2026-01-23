@@ -378,10 +378,15 @@ func (s *SQLiteStorage) upsertIssueInTx(ctx context.Context, tx *sql.Tx, issue *
 
 	// Import dependencies if present
 	for _, dep := range issue.Dependencies {
+		// Default authority to daemon if not specified
+		authority := dep.Authority
+		if authority == "" {
+			authority = types.AuthorityDaemon
+		}
 		_, err = tx.ExecContext(ctx, `
-			INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type, created_at, created_by)
-			VALUES (?, ?, ?, ?, ?)
-		`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy)
+			INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type, created_at, created_by, metadata, thread_id, authority)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy, dep.Metadata, dep.ThreadID, authority)
 		if err != nil {
 			return fmt.Errorf("failed to import dependency: %w", err)
 		}

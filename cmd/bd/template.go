@@ -995,6 +995,7 @@ func cloneSubgraph(ctx context.Context, s storage.Storage, subgraph *TemplateSub
 				IssueID:     newFromID,
 				DependsOnID: newToID,
 				Type:        dep.Type,
+				Authority:   dep.Authority, // Preserve authority from template
 			}
 			if err := tx.AddDependency(ctx, newDep, opts.Actor); err != nil {
 				return fmt.Errorf("failed to create dependency: %w", err)

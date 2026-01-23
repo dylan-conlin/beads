@@ -724,6 +724,10 @@ func (t *sqliteTxStorage) AddDependency(ctx context.Context, dep *types.Dependen
 	if dep.CreatedBy == "" {
 		dep.CreatedBy = actor
 	}
+	// Default authority to daemon if not specified
+	if dep.Authority == "" {
+		dep.Authority = types.AuthorityDaemon
+	}
 
 	// Cycle detection - skip for relates-to (inherently bidirectional)
 	// See dependencies.go for full rationale on cycle prevention
@@ -764,11 +768,11 @@ func (t *sqliteTxStorage) AddDependency(ctx context.Context, dep *types.Dependen
 		}
 	}
 
-	// Insert dependency (including metadata and thread_id for edge consolidation - Decision 004)
+	// Insert dependency (including metadata, thread_id, and authority for decidability substrate)
 	_, err = t.conn.ExecContext(ctx, `
-		INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by, metadata, thread_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy, dep.Metadata, dep.ThreadID)
+		INSERT INTO dependencies (issue_id, depends_on_id, type, created_at, created_by, metadata, thread_id, authority)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, dep.IssueID, dep.DependsOnID, dep.Type, dep.CreatedAt, dep.CreatedBy, dep.Metadata, dep.ThreadID, dep.Authority)
 	if err != nil {
 		return fmt.Errorf("failed to add dependency: %w", err)
 	}

@@ -103,10 +103,15 @@ func (s *SQLiteStorage) tryResurrectParentWithConn(ctx context.Context, conn *sq
 			var targetCount int
 			err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM issues WHERE id = ?`, dep.DependsOnID).Scan(&targetCount)
 			if err == nil && targetCount > 0 {
+				// Default authority to daemon if not specified
+				authority := dep.Authority
+				if authority == "" {
+					authority = types.AuthorityDaemon
+				}
 				_, err := conn.ExecContext(ctx, `
-					INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type, created_by)
-					VALUES (?, ?, ?, ?)
-				`, parentID, dep.DependsOnID, dep.Type, "resurrection")
+					INSERT OR IGNORE INTO dependencies (issue_id, depends_on_id, type, created_by, metadata, thread_id, authority)
+					VALUES (?, ?, ?, ?, ?, ?, ?)
+				`, parentID, dep.DependsOnID, dep.Type, "resurrection", dep.Metadata, dep.ThreadID, authority)
 				if err != nil {
 					// Log but don't fail - dependency resurrection is best-effort
 					fmt.Fprintf(os.Stderr, "Warning: failed to resurrect dependency for %s: %v\n", parentID, err)
